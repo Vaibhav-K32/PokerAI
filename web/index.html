@@ -23,7 +23,11 @@
       <p>Set up a simulated spot or reconstruct a completed hand with two to four players. Tap a card slot to pick a card, or scan a photo of the cards.</p>
     </div>
   </header>
-  <main class="wrap workspace">
+  <nav class="wrap views" aria-label="Views">
+    <button type="button" class="view-tab" data-view="study" aria-current="page">Study table</button>
+    <button type="button" class="view-tab" data-view="replay">Hand replay</button>
+  </nav>
+  <main class="wrap workspace" id="study-view">
     <section class="panel table-panel" aria-labelledby="table-title">
       <div class="heading">
         <h2 id="table-title">Table</h2>
@@ -126,6 +130,67 @@
     </section>
   </main>
 
+  <main class="wrap replay-workspace" id="replay-view" hidden>
+    <section class="panel history-panel" aria-labelledby="history-title">
+      <div class="heading">
+        <h2 id="history-title">Hand history</h2>
+      </div>
+      <div class="actions">
+        <button type="button" id="load-demo">Load demo hand</button>
+        <label class="button secondary file-button">Import JSON<input type="file" id="import-hand" accept="application/json,.json"></label>
+      </div>
+      <p id="history-status" role="status"></p>
+      <ul id="hand-list" class="hand-list" aria-label="Saved hands"></ul>
+      <p class="fine-print">Hands are saved in this browser only. Export a hand to keep a copy or move it to another device.</p>
+    </section>
+
+    <section class="panel replay-panel" aria-labelledby="replay-title">
+      <div class="heading">
+        <div>
+          <h2 id="replay-title">Hand replay</h2>
+          <p id="replay-meta" class="replay-meta">Load the demo hand or open a saved hand.</p>
+        </div>
+        <button type="button" id="replay-analyze" class="secondary" hidden>Analyze this decision</button>
+      </div>
+      <div id="replay-body" hidden>
+        <div class="felt replay-felt" id="replay-felt" role="group" aria-label="Replay table">
+          <div class="replay-seats" id="replay-seats-top"></div>
+          <div class="center">
+            <p class="replay-phase" id="replay-phase"></p>
+            <div class="cards board" id="replay-board" aria-label="Community cards"></div>
+            <p class="replay-pot" id="replay-pot"></p>
+          </div>
+          <div class="replay-seats" id="replay-seats-bottom"></div>
+        </div>
+        <p class="replay-last" id="replay-last" role="status" aria-live="polite"></p>
+
+        <div class="replay-controls" role="group" aria-label="Replay controls">
+          <div class="actions">
+            <button type="button" id="replay-first" class="secondary" aria-label="First event">⏮</button>
+            <button type="button" id="replay-prev" class="secondary" aria-label="Previous event">◀</button>
+            <button type="button" id="replay-play" aria-pressed="false">Play</button>
+            <button type="button" id="replay-next" class="secondary" aria-label="Next event">▶</button>
+            <button type="button" id="replay-last-btn" class="secondary" aria-label="Last event">⏭</button>
+            <label class="speed">Speed
+              <select id="replay-speed">
+                <option value="0.5">0.5×</option>
+                <option value="1" selected>1×</option>
+                <option value="2">2×</option>
+                <option value="4">4×</option>
+              </select>
+            </label>
+          </div>
+          <label class="scrub">Timeline <span id="replay-position"></span>
+            <input type="range" id="replay-scrub" min="0" max="0" step="1" value="0">
+          </label>
+        </div>
+
+        <h3>Events</h3>
+        <ol class="timeline" id="replay-timeline"></ol>
+      </div>
+    </section>
+  </main>
+
   <dialog id="picker" aria-labelledby="picker-title">
     <form method="dialog">
       <h2 id="picker-title">Choose a card</h2>
@@ -139,6 +204,6 @@
     </form>
   </dialog>
 
-  <footer class="wrap">No-limit Hold’em for 2–4 players · For simulation and post-hand review <span id="offline-status"></span></footer>
+  <footer class="wrap">No-limit Hold’em for 2–4 players · Hand replay for up to 10 · For simulation and post-hand review <span id="offline-status"></span></footer>
 </body>
 </html>

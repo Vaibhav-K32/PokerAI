@@ -4,6 +4,8 @@ import type {
   Action, BetAdvice, BetOption, Card, OpponentStyle, Outlook, OutlookRow, Snapshot,
 } from '../core/types.js';
 import { explainFold } from '../core/sizing.js';
+import { cardName, rankLabel, renderCardFace, suitNames, suitSymbols } from './cards-view.js';
+import { initReplay } from './replay.js';
 import { cloudRecognizer, type Confidence, type Recognition } from '../vision/recognizer.js';
 
 function element<T extends HTMLElement>(id: string): T {
@@ -39,16 +41,8 @@ const activeSeats = () => seatGroups.slice(0, opponentCount);
 /** Card groups in play: seated opponents, the board, and the hero. */
 const groupsInPlay = (): SlotGroup[] => [...activeSeats(), 'board', 'hero'];
 
-const rankNames: Record<string, string> = {
-  2: 'Two', 3: 'Three', 4: 'Four', 5: 'Five', 6: 'Six', 7: 'Seven', 8: 'Eight', 9: 'Nine',
-  T: 'Ten', J: 'Jack', Q: 'Queen', K: 'King', A: 'Ace',
-};
-const suitNames: Record<string, string> = { c: 'clubs', d: 'diamonds', h: 'hearts', s: 'spades' };
-const suitSymbols: Record<string, string> = { c: '♣', d: '♦', h: '♥', s: '♠' };
 const boardStreets = ['flop', 'flop', 'flop', 'turn', 'river'];
 
-const cardName = (card: Card) => rankNames[card[0]] + ' of ' + suitNames[card[1]];
-const rankLabel = (card: Card) => (card[0] === 'T' ? '10' : card[0]);
 
 function slotLabel(group: SlotGroup, index: number) {
   if (group === 'board') return 'Board card ' + (index + 1) + ' (' + boardStreets[index] + ')';
@@ -69,17 +63,6 @@ function describeSlot(group: SlotGroup, index: number, slot: Slot) {
     text += ', needs checking';
   }
   return text;
-}
-
-function renderCardFace(node: HTMLElement, card: Card) {
-  node.classList.add(card[1] === 'h' || card[1] === 'd' ? 'red' : 'black');
-  const rank = document.createElement('span');
-  rank.className = 'rank';
-  rank.textContent = rankLabel(card);
-  const suit = document.createElement('span');
-  suit.className = 'suit';
-  suit.textContent = suitSymbols[card[1]];
-  node.append(rank, suit);
 }
 
 function renderSlots() {
@@ -922,6 +905,33 @@ element('clear-photo').addEventListener('click', clearPhoto);
 window.addEventListener('pagehide', clearPhoto);
 
 setOpponentCount(Number(element<HTMLSelectElement>('players').value) - 1);
+
+/** Put a decision from a replayed hand on the study table, ready to analyze. */
+function loadSnapshot(s: Snapshot) {
+  slots = emptySlots();
+  setOpponentCount(s.opponents.length);
+  s.hero.forEach((card, i) => { slots.hero[i] = { card, pending: false }; });
+  s.board.forEach((card, i) => { slots.board[i] = { card, pending: false }; });
+  s.opponents.forEach((o, k) => {
+    const seat = seatGroups[k];
+    o.cards.forEach((card, i) => { slots[seat][i] = { card, pending: false }; });
+    setNumbers({ [seat + '-stack']: String(o.stack), [seat + '-bet']: String(o.committed) });
+  });
+  setNumbers({
+    purpose: s.purpose, pot: String(s.pot), 'hero-stack': String(s.heroStack),
+    committed: String(s.committed), increment: String(s.increment),
+  });
+  updateToCall();
+  s.opponents.forEach((o, k) => {
+    if (o.eligiblePot !== undefined) element<HTMLInputElement>(seatGroups[k] + '-cap').value = String(o.eligiblePot);
+  });
+  invalidate();
+  renderSlots();
+  status.textContent = 'Loaded a decision from the hand replay. Select Analyze hand.';
+  element('table-title').scrollIntoView({ block: 'start' });
+}
+
+initReplay({ onAnalyze: loadSnapshot });
 
 if (window.isSecureContext && 'serviceWorker' in navigator) {
   // When a newer build takes control, reload once so the page runs it. Skip the

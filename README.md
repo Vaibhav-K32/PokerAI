@@ -27,6 +27,10 @@ Lay the cards face-up in three rows: the opponent’s cards farthest from the ca
 
 Run `npm run check` for TypeScript compilation, build, and automated core tests. The browser shell and all assets are built into `dist/`.
 
+### Hand replay
+
+Select **Hand replay** at the top of the page, then **Load demo hand**. It is a four-handed hand with blinds, betting on every street, a showdown, and the pot award, using fictional players. Step through it with the first, previous, play/pause, next, and last buttons, the speed menu, or the timeline slider. You can also click any event in the list. **Analyze this decision** sends the current decision to the study table. Saved hands stay in this browser. Each hand can be renamed, exported as JSON, imported again, or deleted. See [the engine reference](src/history/HISTORY.md) for the event format, rules, and how recognition modules can plug in later.
+
 ## Phone and offline use
 
 For a phone trial, serve `dist/` from an HTTPS static origin the phone can reach. First load it while connected and give the service worker time to cache the app before checking an offline reload. Use your browser’s install or home screen option if available. The file picker works as the fallback on browsers that do not support direct photo capture. The local development server listens on loopback by default. A static host has no `/api/recognize` endpoint, so photo recognition works only through `npm start` (or another server that mounts `scripts/recognize.mjs`); browsers allow camera capture on a phone only over HTTPS.
@@ -36,6 +40,6 @@ For a phone trial, serve `dist/` from an HTTPS static origin the phone can reach
 - [Specification](SPEC.md) covers product boundaries, data contracts, decision assumptions, and capture privacy.
 - [Implementation plan](PLAN.md) covers milestones, the test matrix, and the next work item.
 - [Repository instructions](AGENTS.md) and [Claude Code entry point](CLAUDE.md) define how to divide and review tasks.
-- `src/core/` holds state, the plugin registry, and equity. `src/rules/` holds Hold’em rules. `src/vision/` holds the recognition contract and the cloud recognizer client. `scripts/recognize.mjs` is the server-side Claude API endpoint. `src/web/` and `web/` hold the table interface and worker entry points.
+- `src/core/` holds state, the plugin registry, and equity. `src/rules/` holds Hold’em rules. `src/history/` holds the hand history and replay engine (pure, no browser APIs). `src/vision/` holds the recognition contract and the cloud recognizer client. `scripts/recognize.mjs` is the server-side Claude API endpoint. `src/web/` and `web/` hold the table interface and worker entry points.
 
 The folder is ready to put under Git. Start each coding agent from this directory so it picks up the project instructions.

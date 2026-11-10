@@ -17,6 +17,10 @@
 - **Browser and release.** Run manual and photo flows on current iOS Safari, Android Chrome, and desktop Chromium/Firefox. Verify keyboard flow, 320 px layout, offline reload after caching, worker cancellation, and no image requests in network logs. Target under two seconds for a typical capped equity calculation on a representative midrange phone, then tune the budget from measurements.
 - **CI gate once Git hosting is chosen.** Clean install from lockfile, then npm run check. Run browser tests separately as they are added. Require review for rules, probability, capture, and privacy changes.
 
+## Status
+
+M1 rules and replay: the event-driven hand history engine (`src/history/`) replays 2–10 player hands with antes, side pots, uncalled returns, and split pots. It has a demo hand, heads-up, side-pot, and split-pot fixtures, JSON import and export with validation, and a read-only replay view. Remaining M1 work: a form for recording a new hand event by event, and retiring the older heads-up reducer in `src/rules/holdem-replay.ts` once nothing depends on it.
+
 ## Suggested next work item
 
-Implement a pure heads-up replay reducer with fixed action-history fixtures. Own the core and its unit tests in one branch. Preserve the existing snapshot API so the UI continues working. Follow with weighted range support and a separate capture benchmark.
+Add a hand recorder that builds events through `actionOptions` and `validateCandidate`, so manual entry and later recognition share one path. Then let a screenshot reader propose board and action candidates from a controlled digital layout for user confirmation, measured against labeled fixtures. Follow with weighted range support.

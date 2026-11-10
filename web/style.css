@@ -212,3 +212,67 @@ footer { padding-block: 1.25rem 2rem; color: #425d55; font-size: .88rem; }
 .chip-field.cap { max-width: 9rem; font-size: .68rem; color: #f2e3a6; }
 .chip-field.cap input { width: 6.5rem; border-color: #f2e3a6; }
 .chip-field.cap input::placeholder { color: #b9d2c3; font-weight: 500; }
+
+/* Views ------------------------------------------------------------------- */
+.views { display: flex; gap: .4rem; margin-top: -1rem; margin-bottom: 1.4rem; position: relative; }
+.view-tab { background: #f3f7ee; color: #183d31; border: 1px solid #d5e3ce; border-radius: 2rem; padding: .5rem 1rem; }
+.view-tab[aria-current="page"] { background: #1b634b; border-color: #1b634b; color: #fff; }
+.workspace { margin-top: 0; }
+
+/* Hand history ------------------------------------------------------------ */
+.replay-workspace { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2.2fr); gap: 1.15rem; align-items: start; }
+.file-button { display: inline-flex; align-items: center; min-height: 2.75rem; padding: .55rem .85rem; border-radius: .55rem; font-size: .88rem; font-weight: 700; cursor: pointer; background: #f3f7ee; color: #183d31; border: 1px solid #d5e3ce; }
+.file-button input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.file-button:focus-within { outline: 3px solid #116f5a; outline-offset: 3px; }
+#history-status:empty { display: none; }
+.hand-list { list-style: none; padding: 0; margin: .8rem 0; display: grid; gap: .5rem; }
+.hand-item { border: 1px solid #d7e0d6; border-radius: .7rem; padding: .6rem .7rem; }
+.hand-item.open { border-color: #1b634b; background: #f1f7ea; }
+.hand-open { background: none; border: 0; padding: 0; min-height: 2.2rem; color: #102624; font-size: .95rem; text-align: left; text-decoration: underline; text-underline-offset: 3px; }
+.hand-meta { font-size: .78rem; color: #4a645d; margin: .1rem 0 .4rem; }
+.small-actions button { min-height: 2.4rem; padding: .3rem .6rem; font-size: .8rem; }
+.rename { display: grid; gap: .4rem; }
+.rename label { font-size: .8rem; }
+.empty-list { color: #4a645d; font-size: .88rem; }
+
+/* Replay table ------------------------------------------------------------ */
+.replay-meta { font-size: .85rem; color: #4a645d; margin: .2rem 0 0; }
+.replay-felt { gap: .6rem; --card-w: clamp(2.3rem, 6vw, 3.1rem); }
+.replay-seats { display: flex; flex-wrap: wrap; justify-content: center; gap: .45rem; width: 100%; }
+.replay-seat { display: grid; justify-items: center; gap: .15rem; min-width: 6.2rem; padding: .35rem .45rem; border-radius: .7rem; background: rgba(6, 30, 23, .45); border: 1px solid rgba(234, 244, 228, .2); }
+.replay-seat.acting { border-color: #f2c94c; box-shadow: 0 0 0 2px #f2c94c; }
+.replay-seat.folded { opacity: .5; }
+.replay-seat .seat-name { display: flex; flex-wrap: wrap; justify-content: center; gap: .2rem; align-items: center; font-size: .78rem; text-transform: none; letter-spacing: 0; }
+.seat-badge { padding: 0 .3rem; border-radius: .25rem; font-size: .58rem; font-weight: 800; text-transform: uppercase; background: rgba(234, 244, 228, .2); }
+.badge-dealer { background: #fff; color: #102624; }
+.badge-toact { background: #f2c94c; color: #2b2205; }
+.badge-allin { background: #c0392b; color: #fff; }
+.mini-cards { gap: .2rem; }
+.mini-card { display: grid; justify-items: center; align-content: center; width: 1.9rem; height: 2.6rem; border-radius: .3rem; line-height: 1; font-size: .8rem; }
+.mini-card.face { background: #fdfdfb; }
+.mini-card.face .rank { font: 700 .85rem/1 Georgia, serif; }
+.mini-card.back { background: repeating-linear-gradient(45deg, #34574a, #34574a 4px, #2a4a3e 4px, #2a4a3e 8px); color: #cfe3d6; font-weight: 700; border: 1px solid rgba(234, 244, 228, .4); }
+.seat-stack, .seat-bet { margin: 0; font-size: .72rem; }
+.seat-bet { color: #f2e3a6; font-weight: 700; }
+.replay-phase { margin: 0; font-size: .75rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: #bce78e; }
+.replay-pot { margin: 0; font-weight: 700; }
+.replay-felt .card-slot { cursor: default; }
+.replay-last { min-height: 1.5rem; margin: .6rem 0; font-weight: 650; }
+.replay-controls { display: grid; gap: .6rem; padding: .6rem 0; border-top: 1px solid #d7e0d6; border-bottom: 1px solid #d7e0d6; }
+.replay-controls .actions { align-items: end; }
+.replay-controls .speed select { margin-top: .2rem; min-width: 5rem; }
+.scrub { display: grid; gap: .2rem; font-size: .85rem; }
+.scrub input { width: 100%; min-height: 2.75rem; accent-color: #1b634b; }
+.timeline { list-style: none; padding: 0; margin: .4rem 0; max-height: 22rem; overflow-y: auto; border: 1px solid #e3e9e1; border-radius: .6rem; }
+.timeline-section { padding: .45rem .7rem .2rem; font-size: .72rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #406b55; background: #f6faf2; }
+.timeline-entry button { display: block; width: 100%; text-align: left; background: none; color: #142c28; border: 0; border-radius: 0; min-height: 2.5rem; padding: .35rem .7rem; font-weight: 500; }
+.timeline-entry button:hover { background: #f1f7ea; }
+.timeline-entry button.selected { background: #1b634b; color: #fff; font-weight: 700; }
+
+@media (max-width: 60rem) {
+  .replay-workspace { grid-template-columns: 1fr; }
+}
+@media (max-width: 34rem) {
+  .replay-seat { min-width: 5.2rem; padding: .3rem; }
+  .replay-felt { padding-inline: .5rem; }
+}
