@@ -333,3 +333,65 @@ footer { padding-block: 1.25rem 2rem; color: #425d55; font-size: .88rem; }
   .review-grid { grid-template-columns: 1fr; }
   .review-image { position: static; }
 }
+
+/* Reconstruct hand ------------------------------------------------------- */
+.recon-workspace { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.15rem; margin-top: -1rem; }
+.recon-col { min-width: 0; }
+.recon-tl-button.interval .fine-print { display: block; }
+.recon-metrics { display: flex; flex-wrap: wrap; gap: .5rem 1.2rem; margin: .6rem 0; }
+.recon-metrics div { display: grid; }
+.recon-metrics dt { font-size: .72rem; font-weight: 700; color: #4a645d; text-transform: uppercase; letter-spacing: .05em; }
+.recon-metrics dd { margin: 0; font-size: 1.15rem; font-weight: 750; }
+.recon-grid { display: grid; grid-template-columns: minmax(12rem, .8fr) minmax(0, 1.6fr) minmax(14rem, 1fr); gap: 1rem; align-items: start; }
+.recon-col h3 { margin-top: 0; }
+.recon-list { list-style: none; padding: 0; margin: .5rem 0; display: grid; gap: .45rem; }
+.recon-item { border: 1px solid #d7e0d6; border-radius: .7rem; padding: .4rem; background: #fff; }
+.recon-item.selected { border-color: #1b634b; background: #f1f7ea; }
+.recon-item.drag { opacity: .5; }
+.recon-open { display: flex; gap: .5rem; align-items: center; width: 100%; text-align: left; background: none; color: inherit; padding: .2rem; font-weight: 500; }
+.recon-open:disabled { opacity: 1; cursor: default; }
+.recon-thumb { width: 4.6rem; aspect-ratio: 16 / 10; object-fit: cover; border-radius: .35rem; background: #e8ebe7; flex: none; }
+.recon-thumb.placeholder { display: grid; place-items: center; font-size: .7rem; color: #4a645d; }
+.recon-item-text { display: grid; gap: .1rem; min-width: 0; }
+.recon-label { font-size: .78rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recon-item .small-actions button { min-height: 2.2rem; padding: .25rem .55rem; }
+.recon-table-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: .4rem; }
+.recon-table-head h3 { margin: 0; }
+.recon-steps { display: flex; flex-wrap: wrap; gap: .4rem; margin: .5rem 0; }
+.recon-editor { margin-top: .8rem; display: grid; gap: .8rem; }
+.recon-editor-image { width: 100%; height: auto; border-radius: .6rem; border: 1px solid #d7e0d6; }
+.replay-seat .edited, .replay-pot.edited { text-decoration: underline dotted; text-underline-offset: .2em; }
+.mini-cards.edited { outline: 2px dotted #f2c94c; outline-offset: 2px; border-radius: .3rem; }
+.seat-stack.unknown-value { opacity: .8; }
+.badge-you { background: #f2c94c; color: #102624; }
+.recon-block { border-left: 3px solid #d7e0d6; padding: .1rem 0 .1rem .7rem; margin: .7rem 0; }
+.recon-block h4 { margin: 0 0 .2rem; font-size: .88rem; }
+.recon-block ul, .recon-facts { margin: .2rem 0; padding-left: 1.1rem; font-size: .88rem; }
+.recon-block li { margin: .15rem 0; }
+.recon-block.contradiction { border-color: #b3261e; background: #fff4f2; }
+.recon-block.unresolved { border-color: #d9a800; background: #fffaea; }
+.recon-warn { color: #8a1c12; font-weight: 650; }
+.recon-interval-head { display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
+.recon-status { display: inline-block; padding: .05rem .45rem; border-radius: .3rem; font-size: .72rem; font-weight: 750; background: #e8ebe7; color: #3f4d47; }
+.recon-status.status-verified, .recon-status.status-resolved, .recon-status.status-unchanged { background: #e3f1dc; color: #1b634b; }
+.recon-status.status-unresolved, .recon-status.status-partial, .recon-status.status-acknowledged { background: #fff1c2; color: #5a4a10; }
+.recon-status.status-contradiction { background: #fbd5cf; color: #8a1c12; }
+.recon-status.status-different-hands { background: #dfe6f5; color: #23396b; }
+.recon-resolve { margin-top: .9rem; }
+.recon-action-form { display: flex; flex-wrap: wrap; gap: .5rem; align-items: end; }
+.recon-action-form .review-field { min-width: 7rem; flex: 1; }
+.recon-actions { padding-left: 1.2rem; font-size: .88rem; }
+.link-button { min-height: 0; padding: 0 .35rem; margin-left: .4rem; font-size: .75rem; }
+.recon-timeline { list-style: none; padding: 0; margin: .8rem 0 0; display: grid; gap: .3rem; }
+.recon-tl-button { display: grid; gap: .1rem; width: 100%; text-align: left; background: #f8fbf5; color: inherit; border: 1px solid #d7e0d6; font-weight: 500; }
+.recon-tl-button.selected { border-color: #1b634b; background: #eaf5e1; box-shadow: inset 3px 0 0 #1b634b; }
+.recon-tl-button.interval { margin-left: 1.4rem; width: calc(100% - 1.4rem); background: #fff; border-style: dashed; display: block; }
+@media (max-width: 68rem) {
+  .recon-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); }
+  .recon-changes { grid-column: 1 / -1; }
+}
+@media (max-width: 44rem) {
+  .recon-grid { grid-template-columns: minmax(0, 1fr); }
+  .recon-list { grid-auto-flow: column; grid-auto-columns: minmax(12rem, 1fr); overflow-x: auto; padding-bottom: .3rem; }
+  .recon-tl-button.interval { margin-left: .6rem; width: calc(100% - .6rem); }
+}

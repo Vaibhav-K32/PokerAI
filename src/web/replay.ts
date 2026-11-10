@@ -8,8 +8,8 @@ import { bigBlindSeat, createHandState, potTotal, replaySteps, smallBlindSeat } 
 import { parseHistory, serializeHistory, type HandHistory } from '../history/history.js';
 import { toAnalysisSnapshot } from '../history/snapshot.js';
 import type { GameState, PlayerState } from '../history/types.js';
-import { cardName, renderCardFace } from './cards-view.js';
 import { loadHands, saveHands } from './hand-store.js';
+import { renderBoard, renderSeats, type TableSeat } from './table-view.js';
 
 const MAX_IMPORT_BYTES = 1024 * 1024;
 
@@ -36,7 +36,7 @@ function deepFreeze<T>(value: T): T {
 }
 
 export interface ReplayController {
-  showView(view: 'study' | 'replay' | 'screenshot'): void;
+  showView(view: 'study' | 'replay' | 'screenshot' | 'reconstruct'): void;
   /** Reload saved hands from storage and redraw the list. */
   reloadHands(): void;
   /** Open a saved hand at a replay position and show the replay view. */
@@ -44,7 +44,7 @@ export interface ReplayController {
 }
 
 export function initReplay(options: { onAnalyze: (snapshot: Snapshot) => void; onLeaveScreenshot?: () => void }): ReplayController {
-  const views = ['study', 'replay', 'screenshot'] as const;
+  const views = ['study', 'replay', 'screenshot', 'reconstruct'] as const;
   const tabs = [...document.querySelectorAll<HTMLButtonElement>('.view-tab')];
   const status = element('history-status');
   const list = element('hand-list');
@@ -299,31 +299,11 @@ export function initReplay(options: { onAnalyze: (snapshot: Snapshot) => void; o
     return badges;
   }
 
-  function renderSeat(state: GameState, p: PlayerState) {
-    const seat = document.createElement('div');
-    seat.className = 'replay-seat ' + p.status + (state.actor === p.seat ? ' acting' : '');
-    const badges = seatBadges(state, p);
-    const name = add(seat, 'p', p.name, 'seat-name');
-    for (const badge of badges) add(name, 'span', badge, 'seat-badge badge-' + badge.toLowerCase().replace(/[^a-z]/g, ''));
-    const cards = add(seat, 'div', '', 'cards mini-cards');
-    p.cards.forEach((card: Card | null) => {
-      const node = add(cards, 'span', '', 'mini-card' + (card ? ' face' : ' back'));
-      if (card) {
-        renderCardFace(node, card);
-        node.setAttribute('aria-label', cardName(card));
-      } else {
-        node.textContent = '?';
-        node.setAttribute('aria-label', 'Unknown card');
-      }
-    });
-    add(seat, 'p', 'Stack ' + p.stack.toLocaleString(), 'seat-stack');
-    add(seat, 'p', p.committed ? 'Bet ' + p.committed.toLocaleString() : ' ', 'seat-bet');
-    const status = p.status === 'folded' ? 'folded' : p.status === 'all-in' ? 'all-in' : 'in the hand';
-    seat.setAttribute('aria-label', p.name + ', ' + badges.join(', ') + (badges.length ? ', ' : '') + status
-      + ', stack ' + p.stack + (p.committed ? ', bet ' + p.committed : '')
-      + ', cards ' + p.cards.map(c => (c ? cardName(c) : 'unknown')).join(' and '));
-    seat.setAttribute('role', 'group');
-    return seat;
+  function seatModel(state: GameState, p: PlayerState): TableSeat {
+    return {
+      name: p.name, badges: seatBadges(state, p), status: p.status, acting: state.actor === p.seat,
+      cards: p.cards, stack: p.stack, bet: p.committed,
+    };
   }
 
   const phaseLabels: Record<GameState['phase'], string> = {
@@ -334,27 +314,9 @@ export function initReplay(options: { onAnalyze: (snapshot: Snapshot) => void; o
     if (!current) return;
     const state = current.states[position];
     const total = current.history.events.length;
-    const players = state.players;
-    const half = Math.ceil(players.length / 2);
-    // Clockwise around the table: the first half across the top, the rest back along the bottom.
-    element('replay-seats-top').replaceChildren(...players.slice(0, half).map(p => renderSeat(state, p)));
-    element('replay-seats-bottom').replaceChildren(...players.slice(half).reverse().map(p => renderSeat(state, p)));
-    element('replay-felt').dataset.seats = String(players.length);
-
-    const board = element('replay-board');
-    board.replaceChildren(...Array.from({ length: 5 }, (_, i) => {
-      const slot = document.createElement('span');
-      const card = state.board[i];
-      slot.className = 'card-slot' + (card ? ' filled' : '');
-      if (card) {
-        const face = add(slot, 'span', '', 'face');
-        renderCardFace(face, card);
-        slot.setAttribute('aria-label', cardName(card));
-      } else {
-        slot.setAttribute('aria-hidden', 'true');
-      }
-      return slot;
-    }));
+    renderSeats(element('replay-seats-top'), element('replay-seats-bottom'), state.players.map(p => seatModel(state, p)));
+    element('replay-felt').dataset.seats = String(state.players.length);
+    renderBoard(element('replay-board'), state.board);
     const step = state.step === 'start' ? 'Not started' : state.step === 'post' ? 'Posting blinds' : phaseLabels[state.phase];
     element('replay-phase').textContent = step;
     const pot = potTotal(state);

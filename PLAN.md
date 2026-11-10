@@ -23,6 +23,8 @@ M1 rules and replay: the event-driven hand history engine (`src/history/`) repla
 
 Screenshot import: digital screenshots are read through the Claude endpoint (`layout=screenshot`) behind a provider interface. Users review and correct every field before loading into the study table, saving, or attaching to a matching saved hand. Six synthetic SVG fixtures drive deterministic tests and in-app samples. Next: measure recognition accuracy on a labeled set of consented practice-client screenshots, and add card-region coordinates to highlight detections.
 
+Multi-screenshot reconstruction: up to 20 ordered screenshots are read through the screenshot providers in a bounded queue and compared pairwise. Each interval is reconstructed into confirmed facts, unresolved alternatives, and contradictions, and the user can enter actions, which the hand engine validates. The checkpoint timeline, saved and exported sessions, and matching against saved hands are in place. Five synthetic sequences drive the tests. Next: let a fully resolved reconstruction become a saved hand history when the starting stacks and every action are known, and measure recognition accuracy on labeled practice screenshots.
+
 ## Suggested next work item
 
 Add a hand recorder that builds events through `actionOptions` and `validateCandidate`, so manual entry and later recognition share one path. Then let a screenshot reader propose board and action candidates from a controlled digital layout for user confirmation, measured against labeled fixtures. Follow with weighted range support.

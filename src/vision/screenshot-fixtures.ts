@@ -117,7 +117,7 @@ type Conf = 'high' | 'medium' | 'low' | 'none';
 const f = (value: unknown, confidence: Conf = 'high') => ({ value, confidence: value === null ? 'none' : confidence });
 
 /** The response a careful reader would give for a fully legible table. */
-function responseFor(table: FixtureTable) {
+export function responseFor(table: FixtureTable) {
   return {
     players: table.seats.map(s => ({
       name: f(s.name),
@@ -137,7 +137,7 @@ function responseFor(table: FixtureTable) {
   };
 }
 
-function fixture(id: string, label: string, table: FixtureTable, edit?: (r: ReturnType<typeof responseFor>) => void): ScreenshotFixture {
+export function fixture(id: string, label: string, table: FixtureTable, edit?: (r: ReturnType<typeof responseFor>) => void): ScreenshotFixture {
   const result = responseFor(table);
   edit?.(result);
   return { id, label, table, response: { modelId: 'fixture', result } };

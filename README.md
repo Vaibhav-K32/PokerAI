@@ -37,6 +37,18 @@ Select **Import screenshot**, then drop a PNG, JPEG, or WebP screenshot of a dig
 
 The review screen shows the screenshot (with zoom) beside every recognized field: seats, names, stacks, bets, folded status, hole cards, board, pot, blinds, dealer, and street. Each field is marked High confidence, Needs review, Unknown, or Conflict. Click any card to fix it with the card picker, or mark it unknown. Edit any number, and mark your seat and the dealer. Problems such as duplicate cards or an impossible board block importing until they are fixed. Then choose **Load into study table**, **Save for later** (the image is kept only if you tick the box), or **Attach to hand** to link it to a saved hand it matches, and **Open in hand review**. Details and limits: [src/vision/SCREENSHOTS.md](src/vision/SCREENSHOTS.md).
 
+### Reconstruct a hand from several screenshots
+
+Select **Reconstruct hand**, then add up to 20 screenshots from different moments of one hand by dropping them or choosing several files. You can also pick a sample sequence, which needs no API key. Put them in the order they happened with ↑ and ↓, drag and drop, or **Restore upload order**; file names are never used for ordering. Press **Read screenshots**: each one is read on its own, two at a time, through the same recognition as Import screenshot. A failed screenshot shows **Retry**.
+
+- **Review:** select a screenshot to see it on the table. Choose **Review and correct this screenshot** to fix any field. “?” marks unknown values, and dotted underlines mark your corrections.
+- **Detected changes:** the right-hand panel lists what changed since the previous screenshot, such as new board cards, pot, stack, and bet changes, folds, and shown cards. It also lists contradictions, such as a board card that changed or chips that appeared from nowhere, and what the screenshots do not determine.
+- **Unknown actions:** ambiguous betting stays unresolved. You can leave it, enter the actions you know (each is checked by the hand rules), correct values, or mark the screenshots as different hands.
+- **Timeline:** it steps through the checkpoints. The summary counts corrected fields, verified and unresolved intervals, and contradictions.
+- **Saving:** save the reconstruction in this browser (images only if you tick the box), export or import it as JSON, or check it against saved hands.
+
+Details: [src/reconstruction/RECONSTRUCTION.md](src/reconstruction/RECONSTRUCTION.md).
+
 ## Phone and offline use
 
 For a phone trial, serve `dist/` from an HTTPS static origin the phone can reach. First load it while connected and give the service worker time to cache the app before checking an offline reload. Use your browser’s install or home screen option if available. The file picker works as the fallback on browsers that do not support direct photo capture. The local development server listens on loopback by default. A static host has no `/api/recognize` endpoint, so photo recognition works only through `npm start` (or another server that mounts `scripts/recognize.mjs`); browsers allow camera capture on a phone only over HTTPS.
@@ -46,6 +58,6 @@ For a phone trial, serve `dist/` from an HTTPS static origin the phone can reach
 - [Specification](SPEC.md) covers product boundaries, data contracts, decision assumptions, and capture privacy.
 - [Implementation plan](PLAN.md) covers milestones, the test matrix, and the next work item.
 - [Repository instructions](AGENTS.md) and [Claude Code entry point](CLAUDE.md) define how to divide and review tasks.
-- `src/core/` holds state, the plugin registry, and equity. `src/rules/` holds Hold’em rules. `src/history/` holds the hand history and replay engine (pure, no browser APIs). `src/vision/` holds the photo and screenshot recognition contracts, providers, review checks, and synthetic screenshot fixtures. `scripts/recognize.mjs` is the server-side Claude API endpoint. `src/web/` and `web/` hold the table interface and worker entry points.
+- `src/core/` holds state, the plugin registry, and equity. `src/rules/` holds Hold’em rules. `src/history/` holds the hand history and replay engine (pure, no browser APIs). `src/vision/` holds the photo and screenshot recognition contracts, providers, review checks, and synthetic screenshot fixtures. `src/reconstruction/` holds multi-screenshot reconstruction: observations, the difference engine, interval reconstruction, the batch queue, and sessions (pure, no browser APIs). `scripts/recognize.mjs` is the server-side Claude API endpoint. `src/web/` and `web/` hold the table interface and worker entry points.
 
 The folder is ready to put under Git. Start each coding agent from this directory so it picks up the project instructions.
