@@ -8,6 +8,16 @@ export const MAX_SIDE = 16_384;
 /** Long edge sent for recognition, the size Claude's vision works best at. */
 export const UPLOAD_LONG_EDGE = 1568;
 
+/** A saved JPEG data URL as a Blob, without fetch (which the page's connect-src policy blocks for data: URLs). */
+export function jpegDataUrlToBlob(url: string): Blob {
+  const prefix = 'data:image/jpeg;base64,';
+  if (!url.startsWith(prefix)) throw new Error('Only saved JPEG images can be reopened.');
+  const bytes = atob(url.slice(prefix.length));
+  const out = new Uint8Array(bytes.length);
+  for (let i = 0; i < bytes.length; i++) out[i] = bytes.charCodeAt(i);
+  return new Blob([out], { type: 'image/jpeg' });
+}
+
 /** A readable reason the file cannot be used, or null when it can. */
 export function fileProblem(file: File): string | null {
   if (!(IMAGE_TYPES as readonly string[]).includes(file.type)) return 'Use a PNG, JPEG, or WebP image.';

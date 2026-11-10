@@ -42,8 +42,10 @@ export interface ScreenshotRecognition {
   readonly players: readonly RecognizedPlayer[];
   readonly communityCards: readonly RecognizedCard[];
   readonly pot: RecognizedField<number>;
-  /** True when the pot shown already includes this street's bets. Set by the user. */
+  /** True when the pot shown already includes this street's bets. Follows `potIncludesBetsRead` when known; false otherwise. */
   readonly potIncludesBets: boolean;
+  /** The reader's answer (or the user's) to whether the pot shown includes the bets; `null` value when unclear. */
+  readonly potIncludesBetsRead?: RecognizedField<boolean>;
   readonly smallBlind: RecognizedField<number>;
   readonly bigBlind: RecognizedField<number>;
   /** Index into `players`. */
@@ -57,7 +59,8 @@ export interface ScreenshotRecognition {
 export const MAX_SCREEN_PLAYERS = 10;
 const STREETS: readonly Street[] = ['preflop', 'flop', 'turn', 'river'];
 const BOARD_STREET: Record<number, Street> = { 0: 'preflop', 3: 'flop', 4: 'turn', 5: 'river' };
-const MAX_CHIPS = 1_000_000_000;
+/** Largest chip amount accepted anywhere: provider output, corrections, and saved files. */
+export const MAX_CHIPS = 1_000_000_000;
 
 export class RecognitionFormatError extends Error {
   constructor(message: string) {
@@ -130,6 +133,8 @@ export function parseScreenshotResponse(payload: unknown, providerId: string): S
   const seatIndex = (v: unknown): v is number => Number.isSafeInteger(v) && (v as number) >= 0 && (v as number) < players.length;
 
   const observedStreet = fieldOf(r.street, 'street', isStreet);
+  // Optional, so older responses and fixtures without it still parse.
+  const potRead = r.potIncludesBets === undefined ? undefined : fieldOf(r.potIncludesBets, 'pot includes bets', (v): v is boolean => typeof v === 'boolean');
   const warnings = Array.isArray(r.issues) ? r.issues.filter((s): s is string => typeof s === 'string').slice(0, 8) : [];
   return {
     providerId,
@@ -137,7 +142,8 @@ export function parseScreenshotResponse(payload: unknown, providerId: string): S
     players,
     communityCards,
     pot: fieldOf(r.pot, 'pot', isChips),
-    potIncludesBets: false,
+    potIncludesBets: potRead?.value ?? false,
+    ...(potRead ? { potIncludesBetsRead: potRead } : {}),
     smallBlind: fieldOf(r.smallBlind, 'small blind', isChips),
     bigBlind: fieldOf(r.bigBlind, 'big blind', isChips),
     dealerSeat: fieldOf(r.dealerSeat, 'dealer seat', seatIndex),
@@ -172,6 +178,21 @@ export function indicator(field: RecognizedField<unknown>): Indicator {
 }
 
 export const indicatorLabels: Record<Indicator, string> = { high: 'High confidence', review: 'Needs review', unknown: 'Unknown' };
+
+/**
+ * Read a chip amount typed by the user. Blank means unknown. Rejects input
+ * the browser could not parse (`badInput`), fractions, negatives, and amounts
+ * above MAX_CHIPS, so a correction never fails a later reload.
+ */
+export function parseChipInput(text: string, badInput = false): { value: number | null } | { error: string } {
+  const trimmed = text.trim();
+  if (badInput) return { error: 'Enter a whole number of chips, or leave it blank for unknown.' };
+  if (trimmed === '') return { value: null };
+  const value = Number(trimmed);
+  if (!Number.isSafeInteger(value) || value < 0) return { error: 'Use a whole number of chips, or leave it blank for unknown.' };
+  if (value > MAX_CHIPS) return { error: 'Use at most ' + MAX_CHIPS.toLocaleString('en-US') + ' chips.' };
+  return { value };
+}
 
 /** A user edit: the value is now known (or deliberately unknown) and confirmed. */
 export function corrected<T>(value: T | null): RecognizedField<T> {
@@ -270,6 +291,13 @@ export function reviewScreenshot(rec: ScreenshotRecognition): ReviewIssue[] {
     error('smallBlind', 'The small blind is larger than the big blind.');
   }
   if (rec.bigBlind.value === 0) error('bigBlind', 'The big blind must be positive.');
+  if (rec.smallBlind.value === 0) error('smallBlind', 'The small blind must be positive.');
+  const read = rec.potIncludesBetsRead;
+  if (rec.pot.value !== null && bets > 0 && (!read || indicator(read) !== 'high')) {
+    review('potIncludesBets', read?.value === null || !read
+      ? 'It is not clear whether the pot shown already includes the bets in front of players. Tick the box if it does.'
+      : 'Check whether the pot shown already includes the bets in front of players (read as ' + (read.value ? 'included' : 'not included') + ').');
+  }
   if (rec.bigBlind.value === null) review('bigBlind', 'The big blind was not found; it sets the minimum bet for analysis.');
   return issues;
 }
@@ -401,6 +429,7 @@ export function restoreRecognition(raw: unknown): ScreenshotRecognition {
     communityCards: raw.communityCards.map((c: unknown, i: number) => restoreCard(c, 'saved board ' + (i + 1))),
     pot: restoreField(raw.pot, isChips, 'saved pot'),
     potIncludesBets: raw.potIncludesBets === true,
+    ...(raw.potIncludesBetsRead !== undefined ? { potIncludesBetsRead: restoreField(raw.potIncludesBetsRead, (v): v is boolean => typeof v === 'boolean', 'saved pot includes bets') } : {}),
     smallBlind: restoreField(raw.smallBlind, isChips, 'saved small blind'),
     bigBlind: restoreField(raw.bigBlind, isChips, 'saved big blind'),
     dealerSeat: restoreField(raw.dealerSeat, seatIndex, 'saved dealer'),

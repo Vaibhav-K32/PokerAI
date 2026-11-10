@@ -24,7 +24,7 @@ import { claudeScreenshotProvider, fixtureProvider, type ScreenshotProvider } fr
 import { drawTable } from '../vision/screenshot-fixtures.js';
 import type { ScreenshotRecognition } from '../vision/screenshot.js';
 import { loadHands } from './hand-store.js';
-import { decodeImage, fileProblem, prepareUpload, svgToPng } from './image.js';
+import { decodeImage, fileProblem, jpegDataUrlToBlob, prepareUpload, svgToPng } from './image.js';
 import { renderRecognitionEditor } from './recognition-editor.js';
 import { loadReconstructions, saveReconstructions } from './reconstruction-store.js';
 import type { ReplayController } from './replay.js';
@@ -996,7 +996,7 @@ export function initReconstruction(options: { replay: ReplayController }) {
       // Decode saved images so they can be re-sent if a screenshot is still unread.
       for (const shot of shots) {
         if (!shot.url || observations.has(shot.entry.id)) continue;
-        void fetch(shot.url).then(r => r.blob()).then(decodeImage).then(bitmap => {
+        void Promise.resolve(shot.url).then(jpegDataUrlToBlob).then(decodeImage).then(bitmap => {
           shot.bitmap = bitmap;
           shot.provider = claudeScreenshotProvider();
           renderProgress();

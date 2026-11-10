@@ -13,7 +13,7 @@ import { matchObservation } from '../dist/history/observation.js';
 import { claudeScreenshotProvider, fixtureProvider, localScreenshotProvider } from '../dist/vision/providers.js';
 import { drawTable, fixtureById, SCREENSHOT_FIXTURES } from '../dist/vision/screenshot-fixtures.js';
 import {
-  corrected, correctedCard, indicator, parseScreenshotResponse, restoreRecognition, reviewScreenshot,
+  corrected, correctedCard, indicator, MAX_CHIPS, parseChipInput, parseScreenshotResponse, restoreRecognition, reviewScreenshot,
   toStudySnapshot, toTableObservation,
 } from '../dist/vision/screenshot.js';
 import { createRecognizeHandler, SCREENSHOT_SCHEMA } from '../scripts/recognize.mjs';
@@ -357,4 +357,67 @@ test('a reviewed screenshot converts to an observation that finds its hand', () 
   const snapshot = toStudySnapshot(rec, 'completed').snapshot;
   assert.equal(snapshot.pot, 135);
   assert.deepEqual(snapshot.opponents.map(o => o.committed), [0, 40]);
+});
+
+// ---------------------------------------------------------------------------
+// Audit follow-ups: blinds, missing dealer, chip input, pot-includes-bets
+// ---------------------------------------------------------------------------
+
+test('impossible blinds are blocking errors and a missing dealer is flagged for review', () => {
+  const rec = recognize('heads-up-preflop');
+  assert.ok(errors({ ...rec, smallBlind: corrected(20) }).some(e => e.field === 'smallBlind' && /larger than the big blind/.test(e.message)));
+  assert.ok(errors({ ...rec, bigBlind: corrected(0) }).some(e => e.field === 'bigBlind'));
+  assert.ok(errors({ ...rec, smallBlind: corrected(0) }).some(e => e.field === 'smallBlind' && /must be positive/.test(e.message)));
+  const noDealer = { ...rec, dealerSeat: corrected(null) };
+  assert.ok(reviews(noDealer).some(i => i.field === 'dealerSeat'));
+  assert.deepEqual(errors(noDealer), []);
+});
+
+test('typed chip amounts: blank is unknown; fractions, negatives, unparseable, and oversized input are rejected', () => {
+  assert.deepEqual(parseChipInput(''), { value: null });
+  assert.deepEqual(parseChipInput(' 250 '), { value: 250 });
+  assert.deepEqual(parseChipInput(String(MAX_CHIPS)), { value: MAX_CHIPS });
+  for (const bad of ['12.5', '-5', String(MAX_CHIPS + 1), '1e20', 'abc']) assert.ok('error' in parseChipInput(bad), bad);
+  // The browser reports unparseable text in a number field as blank plus badInput; it must not become "unknown".
+  assert.ok('error' in parseChipInput('', true));
+  // Anything accepted survives a save and reload.
+  const rec = { ...recognize('heads-up-preflop'), pot: corrected(parseChipInput(String(MAX_CHIPS)).value) };
+  assert.equal(restoreRecognition(JSON.parse(JSON.stringify(rec))).pot.value, MAX_CHIPS);
+});
+
+test('the reader says whether the pot includes bets; unclear answers are flagged and corrections settle them', () => {
+  const base = fixtureById('four-player-turn').response.result; // bets in front, pot drawn separately
+  const read = result => parseScreenshotResponse({ modelId: 'm', result }, 'x');
+  const potFlag = rec => reviews(rec).filter(i => i.field === 'potIncludesBets');
+
+  const clear = read(base);
+  assert.deepEqual(clear.potIncludesBetsRead, { value: false, confidence: 'high', source: 'observed' });
+  assert.equal(clear.potIncludesBets, false);
+  assert.deepEqual(potFlag(clear), []);
+
+  const unsure = read({ ...base, potIncludesBets: { value: null, confidence: 'none' } });
+  assert.equal(unsure.potIncludesBets, false);
+  assert.match(potFlag(unsure)[0].message, /not clear whether the pot shown already includes the bets/);
+  const settled = { ...unsure, potIncludesBets: true, potIncludesBetsRead: corrected(true) };
+  assert.deepEqual(potFlag(settled), []);
+
+  const low = read({ ...base, potIncludesBets: { value: true, confidence: 'low' } });
+  assert.equal(low.potIncludesBets, true);
+  assert.match(potFlag(low)[0].message, /read as included/);
+
+  const older = { ...base };
+  delete older.potIncludesBets;
+  const legacy = read(older);
+  assert.equal(legacy.potIncludesBetsRead, undefined);
+  assert.equal(potFlag(legacy).length, 1, 'responses without the answer are flagged when bets are out');
+
+  // When the pot already includes the bets, they are not added again.
+  const included = read({ ...base, pot: { value: 300, confidence: 'high' }, potIncludesBets: { value: true, confidence: 'high' } });
+  const hero = { ...included, heroSeat: corrected(0) };
+  assert.equal(toStudySnapshot(hero, 'completed').snapshot.pot, 300);
+  assert.equal(toStudySnapshot(clear, 'completed').snapshot.pot, 240 + 60);
+
+  assert.throws(() => read({ ...base, potIncludesBets: { value: 'yes', confidence: 'high' } }), /pot includes bets/);
+  assert.deepEqual(restoreRecognition(JSON.parse(JSON.stringify(low))).potIncludesBetsRead, low.potIncludesBetsRead);
+  assert.ok(SCREENSHOT_SCHEMA.required.includes('potIncludesBets'));
 });

@@ -128,6 +128,8 @@ export function responseFor(table: FixtureTable) {
     })),
     board: table.board.map(c => ({ card: c, confidence: 'high' })),
     pot: f(table.pot),
+    // These fictional tables draw bets beside the seats, outside the pot.
+    potIncludesBets: f(table.pot === null ? null : false),
     smallBlind: f(table.blinds?.[0] ?? null),
     bigBlind: f(table.blinds?.[1] ?? null),
     dealerSeat: f(table.seats.findIndex(s => s.dealer) >= 0 ? table.seats.findIndex(s => s.dealer) : null),

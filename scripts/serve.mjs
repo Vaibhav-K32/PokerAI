@@ -24,7 +24,7 @@ const host = process.env.HOST ?? '127.0.0.1';
 const recognize = createRecognizeHandler();
 createServer(async (request, response) => {
   response.setHeader('X-Content-Type-Options', 'nosniff');
-  response.setHeader('Content-Security-Policy', "default-src 'self'; img-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'");
+  response.setHeader('Content-Security-Policy', "default-src 'self'; img-src 'self' blob: data:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'");
   response.setHeader('Cache-Control', 'no-cache');
   if (new URL(request.url, 'http://localhost').pathname === '/api/recognize') {
     await recognize(request, response);

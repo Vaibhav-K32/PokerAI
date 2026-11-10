@@ -70,11 +70,12 @@ const screenSeat = {
 };
 export const SCREENSHOT_SCHEMA = {
   type: 'object', additionalProperties: false,
-  required: ['players', 'board', 'pot', 'smallBlind', 'bigBlind', 'dealerSeat', 'heroSeat', 'street', 'issues'],
+  required: ['players', 'board', 'pot', 'potIncludesBets', 'smallBlind', 'bigBlind', 'dealerSeat', 'heroSeat', 'street', 'issues'],
   properties: {
     players: { type: 'array', items: screenSeat },
     board: { type: 'array', items: screenCard },
     pot: field(nullable({ type: 'integer' })),
+    potIncludesBets: field(nullable({ type: 'boolean' })),
     smallBlind: field(nullable({ type: 'integer' })),
     bigBlind: field(nullable({ type: 'integer' })),
     // Indexes into players.
@@ -94,7 +95,7 @@ Players: list every visible seat in clockwise order, starting with the seat at t
 - status: "folded" when the seat is clearly out of the hand (greyed out, a Fold label, no cards while others have cards), "active" when clearly still in, otherwise "unknown"
 - cards: the seat's hole cards. Use the card code when face-up and readable, "unknown" when face-up but not readable, "hidden" for a face-down card back, and an empty list when the seat shows no cards at all.
 
-Board: the community cards left to right (0 to 5). Pot: the total pot number displayed in the middle, else null. Blinds: only if displayed as text, else null. dealerSeat and heroSeat: indexes into your players list for the seat with the dealer button and for the user's own seat (face-up hole cards at the bottom), else null. Street: only if the screen states it in text; otherwise null.
+Board: the community cards left to right (0 to 5). Pot: the total pot number displayed in the middle, else null. potIncludesBets: true if the client's pot number visibly already counts the chips in front of players (for example it is labelled "Total pot" and exceeds the collected chips), false if those bets are shown separately and clearly not yet collected, null when you cannot tell. Blinds: only if displayed as text, else null. dealerSeat and heroSeat: indexes into your players list for the seat with the dealer button and for the user's own seat (face-up hole cards at the bottom), else null. Street: only if the screen states it in text; otherwise null.
 
 Card codes are a rank from 2 3 4 5 6 7 8 9 T J Q K A followed by a suit letter: c clubs, d diamonds, h hearts, s spades. A ten is T.
 

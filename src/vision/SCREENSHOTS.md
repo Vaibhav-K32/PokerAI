@@ -37,20 +37,21 @@ Blocking problems prevent saving, attaching, and loading:
 - **Impossible boards:** a board with 1, 2, or more than 5 cards.
 - **Conflicting streets:** the street shown on screen contradicts the board.
 - **Seat counts:** fewer than two seats, or fewer than two still in the hand.
-- **Chip amounts:** a pot smaller than the bets it includes, or a small blind larger than the big blind.
+- **Chip amounts:** a pot smaller than the bets it includes, a small blind larger than the big blind, or a blind of 0.
 
-Unreadable cards, unknown stacks or bets, low-confidence values, and an unknown dealer or seat are marked for review.
+Unreadable cards, unknown stacks or bets, low-confidence values, an unknown dealer or seat, and an unclear answer on whether the pot includes the bets are marked for review. Typed chip amounts must be whole numbers from 0 to 1,000,000,000; anything else is refused rather than stored as unknown.
 
 **Load into study table** also needs a complete decision:
 - **Your seat:** both of your cards and your stack.
 - **Players:** two to four players still in the hand, with every stack, bet, and status known.
 - **Table:** the pot, every board card, and the big blind, which is used as the minimum raise increment because a screenshot does not show the last raise size.
 
-If anything is missing, the button lists what to fill in. A screenshot pot usually excludes the bets in front of players, so the app adds them. Tick “The pot shown already includes the bets” when the client’s pot already counts them. The study table changes only when you select Load; a failed or cancelled scan leaves it untouched.
+If anything is missing, the button lists what to fill in. The reader also reports whether the pot shown already counts the bets in front of players. The box “The pot shown already includes the bets” starts from that answer. When the answer is missing or uncertain and there are bets out, the box is flagged for review. Unticked, the app adds the bets to the pot. The study table changes only when you select Load; a failed or cancelled scan leaves it untouched.
 
 ## Saving and saved hands
 
-- **Save for later** keeps the reviewed state in this browser (`poker-study:screenshots`). The image is stored only when you tick **Also save the screenshot image**, as a resized JPEG.
+- **Save for later** keeps the reviewed state in this browser (`poker-study:screenshots`). The image is stored only when you tick **Also save the screenshot image**, as a resized JPEG. It is always the screenshot the review was read from, even if you have since chosen another file.
+- **Replacing a review:** reading another screenshot or opening a saved one asks first when the current review has unsaved corrections.
 - **Attach to hand** lists saved hands that agree with everything the screenshot shows. It uses `matchObservation` in `src/history/observation.ts`, which replays each hand and compares the board, pot, stacks, bets, folds, known cards, and names (when visible) at every event and seat rotation. After you confirm, the hand gains an attachment at that event. No events are added: a screenshot is one observed moment, not proof of earlier actions. Imported hand files re-check every attachment.
 - **Open in hand review** opens the attached hand in the replay view at the matching event, where its attached screenshots are listed.
 

@@ -52,7 +52,12 @@ export function initScreenshotImport(options: { loadIntoTable: (snapshot: Snapsh
     option.value = f.id;
   }
 
-  let image: { file: File; bitmap: ImageBitmap; url: string; provider: ScreenshotProvider; label: string } | null = null;
+  type Upload = { file: File; bitmap: ImageBitmap; url: string; provider: ScreenshotProvider; label: string };
+  let image: Upload | null = null;
+  /** The upload the review was read from. Kept until the review is replaced, even after a new file is chosen. */
+  let reviewed: Upload | null = null;
+  /** True after an edit that has not been saved or attached. */
+  let unsavedEdits = false;
   let request: AbortController | null = null;
   let rec: ScreenshotRecognition | null = null;
   /** Image shown in review: the current upload, or a saved data URL. */
@@ -65,11 +70,13 @@ export function initScreenshotImport(options: { loadIntoTable: (snapshot: Snapsh
   // -------------------------------------------------------------------------
   // Upload
   // -------------------------------------------------------------------------
+  function release(upload: Upload) {
+    upload.bitmap.close();
+    URL.revokeObjectURL(upload.url);
+  }
+
   function releaseImage() {
-    if (image) {
-      image.bitmap.close();
-      URL.revokeObjectURL(image.url);
-    }
+    if (image && image !== reviewed) release(image);
     image = null;
     preview.removeAttribute('src');
     previewBox.hidden = true;
@@ -164,6 +171,8 @@ export function initScreenshotImport(options: { loadIntoTable: (snapshot: Snapsh
 
   readButton.addEventListener('click', async () => {
     if (!image) return;
+    if (rec && unsavedEdits
+      && !confirm('Read the new screenshot? Your unsaved corrections to the current review will be replaced.')) return;
     const source = image;
     cancel();
     const controller = new AbortController();
@@ -186,6 +195,7 @@ export function initScreenshotImport(options: { loadIntoTable: (snapshot: Snapsh
         readButton.textContent = outcome.retryable ? 'Try again' : 'Read table';
       } else {
         savedId = null;
+        useReviewed(source);
         reviewSource = source.url;
         showReview(outcome.recognition);
         status.textContent = 'Recognized. Check the review below; nothing is loaded until you choose to.';
@@ -205,9 +215,16 @@ export function initScreenshotImport(options: { loadIntoTable: (snapshot: Snapsh
   // -------------------------------------------------------------------------
   // Review
   // -------------------------------------------------------------------------
+  /** Switch the review to another upload (or none), freeing the previous one if nothing else uses it. */
+  function useReviewed(next: Upload | null) {
+    if (reviewed && reviewed !== next && reviewed !== image) release(reviewed);
+    reviewed = next;
+  }
+
   function showReview(recognition: ScreenshotRecognition) {
     rec = recognition;
     notice = '';
+    unsavedEdits = false;
     reviewPanel.hidden = false;
     if (reviewSource) reviewImage.src = reviewSource;
     else reviewImage.removeAttribute('src');
@@ -231,6 +248,7 @@ export function initScreenshotImport(options: { loadIntoTable: (snapshot: Snapsh
     statePanel.replaceChildren();
     const issues = renderRecognitionEditor(statePanel, r, next => {
       notice = '';
+      unsavedEdits = true;
       rec = next;
       renderReview();
     }, 'shot');
@@ -360,8 +378,9 @@ export function initScreenshotImport(options: { loadIntoTable: (snapshot: Snapsh
   async function imageData(): Promise<string | undefined> {
     if (!reviewSource) return undefined;
     if (reviewSource.startsWith('data:')) return reviewSource;
-    if (!image) return undefined;
-    const blob = await prepareUpload(image.bitmap);
+    // Always the image the review was read from, never a newer upload.
+    if (!reviewed || reviewed.url !== reviewSource) return undefined;
+    const blob = await prepareUpload(reviewed.bitmap);
     return await new Promise(resolve => {
       const reader = new FileReader();
       reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : undefined);
@@ -390,6 +409,7 @@ export function initScreenshotImport(options: { loadIntoTable: (snapshot: Snapsh
       return null;
     }
     savedId = entry.id;
+    unsavedEdits = false;
     reloadSaved();
     renderReview();
     return entry;
@@ -414,7 +434,9 @@ export function initScreenshotImport(options: { loadIntoTable: (snapshot: Snapsh
       open.type = 'button';
       open.addEventListener('click', () => {
         cancel();
+        if (rec && unsavedEdits && !confirm('Open “' + entry.name + '”? Your unsaved corrections to the current review will be replaced.')) return;
         savedId = entry.id;
+        useReviewed(null);
         reviewSource = entry.image ?? null;
         showReview(entry.recognition);
         status.textContent = 'Opened “' + entry.name + '”' + (entry.image ? '.' : '. The image was not saved, only the reviewed state.');
@@ -440,7 +462,7 @@ export function initScreenshotImport(options: { loadIntoTable: (snapshot: Snapsh
   }
 
   reloadSaved();
-  window.addEventListener('pagehide', () => { cancel(); releaseImage(); });
+  window.addEventListener('pagehide', () => { cancel(); releaseImage(); useReviewed(null); });
 
   return {
     /** Stop any recognition in flight when the user leaves the view. */

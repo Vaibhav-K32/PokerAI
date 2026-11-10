@@ -3,7 +3,7 @@
 // produces a new recognition (marked as corrected) and is re-checked.
 import type { Card } from '../core/types.js';
 import {
-  corrected, correctedCard, indicator, indicatorLabels, inferStreet, reviewScreenshot,
+  corrected, correctedCard, indicator, indicatorLabels, inferStreet, MAX_CHIPS, parseChipInput, reviewScreenshot,
   type RecognizedCard, type RecognizedField, type RecognizedPlayer, type ReviewIssue, type ScreenshotRecognition, type Street,
 } from '../vision/screenshot.js';
 import { pickCard } from './card-picker.js';
@@ -48,21 +48,21 @@ export function renderRecognitionEditor(
     const input = add(wrap, 'input');
     input.type = 'number';
     input.min = '0';
+    input.max = String(MAX_CHIPS);
     input.step = '1';
     input.inputMode = 'numeric';
     input.placeholder = 'Unknown';
     input.value = field.value === null ? '' : String(field.value);
     badge(wrap, field, path);
     input.addEventListener('change', () => {
-      const text = input.value.trim();
-      const value = text === '' ? null : Number(text);
-      if (value !== null && (!Number.isSafeInteger(value) || value < 0)) {
-        input.setCustomValidity('Use a whole number of chips, or leave it blank for unknown.');
+      const parsed = parseChipInput(input.value, input.validity.badInput);
+      if ('error' in parsed) {
+        input.setCustomValidity(parsed.error);
         input.reportValidity();
         return;
       }
       input.setCustomValidity('');
-      set(corrected(value));
+      set(corrected(parsed.value));
     });
   }
 
@@ -193,7 +193,8 @@ export function renderRecognitionEditor(
   box.type = 'checkbox';
   box.checked = r.potIncludesBets;
   includes.append(' The pot shown already includes the bets in front of players');
-  box.addEventListener('change', () => update(x => ({ ...x, potIncludesBets: box.checked })));
+  if (r.potIncludesBetsRead) badge(includes, r.potIncludesBetsRead, 'potIncludesBets');
+  box.addEventListener('change', () => update(x => ({ ...x, potIncludesBets: box.checked, potIncludesBetsRead: corrected(box.checked) })));
   const blinds = add(table, 'div', '', 'review-row');
   numberField(blinds, 'Small blind', r.smallBlind, 'smallBlind', f => update(x => ({ ...x, smallBlind: f })));
   numberField(blinds, 'Big blind', r.bigBlind, 'bigBlind', f => update(x => ({ ...x, bigBlind: f })));
