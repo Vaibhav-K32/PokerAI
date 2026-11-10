@@ -339,7 +339,7 @@ test('duplicate cards are caught within a screenshot and across screenshots', ()
   assert.ok(result.checkpoints[1].contradictions.some(c => /7s appears 2 times/.test(c.text)));
   const later = { ...b, recognition: setPlayer(b.recognition, 1, p => ({ ...p, cards: [correctedCard('Qh'), correctedCard('2d')] })) };
   const cross = reconstructHand([a, later]);
-  assert.ok(cross.globalContradictions.some(c => /Qh appears in your hand in screenshot 1 and in Riley’s hand in screenshot 2/.test(c.text)));
+  assert.ok(cross.globalContradictions.some(c => /Qh appears in your hand in frame 1 and in Riley’s hand in frame 2/.test(c.text)));
 });
 
 test('different-hand signs and chip conservation are flagged for review', () => {

@@ -44,9 +44,25 @@ Recognition emits per-slot candidate cards with confidence labels, a model ID, u
 
 Import screenshot reads one user-selected screenshot of a digital table from a simulated or completed hand. It accepts PNG, JPEG, and WebP files up to 12 MB and 200 to 16,384 pixels per side. The image is resized and re-encoded before an explicit **Read table** sends it through the same `/api/recognize` endpoint (`layout=screenshot`). Recognition returns per-field values with the reader's uncalibrated confidence label, or none, and a source: observed, inferred, or corrected. Unknown values stay unknown; only the street is inferred, from the board count, when the screen does not state it. Runtime validation rejects malformed or impossible provider output. Review checks block duplicate cards, impossible boards, conflicting streets, and impossible chip amounts, and flag unreadable or uncertain fields. Every field is correctable. Loading into the study table requires a complete, valid decision snapshot. A saved screenshot keeps its image only when the user opts in. A screenshot can be attached to a saved hand only where a replayed state agrees with everything observed; it never adds events. Live-game monitoring and play advice are out of scope. Details: [src/vision/SCREENSHOTS.md](src/vision/SCREENSHOTS.md).
 
-### Multi-screenshot reconstruction
+### Frame-to-frame hand tracking
 
-Reconstruct hand reads up to 20 user-ordered screenshots of one simulated or completed hand. Each screenshot has a stable ID. Order is set by the user and never taken from file names or times. Each screenshot goes through the screenshot import pipeline, at most two requests at a time. Recognized screenshots are not re-sent in a session, failures can be retried one at a time, and late results are discarded after removal or cancellation. Each result becomes an observation that keeps unknown values, confidence labels, sources, corrections, and its review status. A deterministic difference engine compares neighbouring observations. Missing values are never counted as changes. Each difference records its values, observation IDs, evidence class, confidence, and severity. Reconstruction separates confirmed facts, possible transitions (never treated as fact), and contradictions. Contradictions include changed cards, a board that shrinks, a player unfolding, a moved dealer button, changed blinds, a card in two places, and chip totals that are not conserved. Ambiguous intervals stay unresolved unless the user enters actions. The hand engine's reducer validates those actions against a checkpoint state built from the earlier screenshot; its rules are not relaxed. Only valid user-entered actions become events. The timeline navigates checkpoints and replays only confirmed actions. Sessions are saved in `localStorage` or exported as validated JSON (schema version 1). Images are stored only on request. The summary reports counts, not an accuracy percentage. Details: [src/reconstruction/RECONSTRUCTION.md](src/reconstruction/RECONSTRUCTION.md).
+Track hand reconstructs one simulated or completed hand from up to 20 frames. The frames are user-ordered screenshots, or frames the user picks from a local video after sampling it at a set interval (at most 120 samples). The video is decoded in the browser and never uploaded; only selected frames are read. Order is set by the user and never taken from file names. Video frames keep their real position in the video, and no other timestamp is created.
+
+Recognition reuses the screenshot pipeline, two requests at a time. Results are cached per frame, failed frames can be retried one at a time, and late results are dropped. Each frame becomes an observation that keeps unknown values, confidence labels, sources, corrections, and its review status.
+
+Four separate, deterministic modules process the observations:
+- **Identity** matches each seat to a persistent player by the user's choice, then name, then the user's own seat, then seat position relative to already-matched players. Position is used only when the table size is unchanged and the matched players agree on one rotation. Seats it cannot settle stay unmatched with candidates and are never merged on weak evidence. Players out of view are listed as missing, never as folded.
+- **Comparison** lists differences player by player, separating unknown from zero.
+- **Consistency** classifies each pair of frames as consistent, consistent with missing information, ambiguous, contradictory, or split.
+- **Reconstruction** separates observed facts, inferred possibilities, and user-confirmed facts and actions.
+
+User-entered actions are validated by the hand engine's reducer without relaxing its rules. Only those actions become events.
+
+Replay lists observed frames, verified events, and unresolved intervals. It shows the engine's states for verified events and never invents intermediate actions.
+
+Sessions (schema version 2, with a migration from version 1) store frame order, sources, observations, corrections, player matches, hidden-player marks, confirmed changes and actions, and validation results. Images are stored only on request.
+
+Details: [src/reconstruction/RECONSTRUCTION.md](src/reconstruction/RECONSTRUCTION.md).
 
 ## Platform and interface
 

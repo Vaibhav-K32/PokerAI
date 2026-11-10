@@ -1,15 +1,19 @@
-// Reconstruct hand: upload several screenshots of one hand, order them, read
-// each through the screenshot recognition providers (two at a time), review
-// and correct each one, and walk the checkpoint timeline. Intervals between
-// screenshots stay unresolved unless the user confirms actions, which the
-// hand engine checks. Nothing here changes the study table or saved hands.
+// Track hand: upload screenshots, or pick frames from a recorded video, of one
+// simulated or finished hand; read each frame through the screenshot
+// recognition providers (two at a time); review and correct each one; match
+// players across frames; and walk a replay of observed frames, verified events,
+// and unresolved gaps. Gaps stay unresolved unless the user enters actions,
+// which the hand engine checks. Offline study only: nothing here watches a
+// live game, and nothing changes the study table or saved hands.
 import { createHandState, replaySteps } from '../history/engine.js';
-import { moveCursor } from '../history/cursor.js';
 import type { GameState } from '../history/types.js';
-import { SEQUENCE_FIXTURES, sequenceById } from '../reconstruction/fixtures.js';
+import { CONSISTENCY_LABELS } from '../reconstruction/consistency.js';
+import { DEMO_CONFIRMED_ACTIONS, DEMO_SEQUENCE, SEQUENCE_FIXTURES, sequenceById, type SequenceFixture } from '../reconstruction/fixtures.js';
+import { NEW_PLAYER, remapOverrides, setOverride } from '../reconstruction/identity.js';
 import { createObservation, middleChips, seatName, withRecognition } from '../reconstruction/observation.js';
 import { RecognitionQueue } from '../reconstruction/queue.js';
-import { matchHistory, reconstructHand } from '../reconstruction/reconstruct.js';
+import { differenceKey, matchHistory, reconstructHand } from '../reconstruction/reconstruct.js';
+import { buildReplaySteps, checkpointStep, moveStep, STEP_KIND_LABELS, type ReplayStep } from '../reconstruction/replay-steps.js';
 import { ACTION_LABELS } from '../reconstruction/resolve.js';
 import {
   addScreenshots, createSession, liveResolutions, moveScreenshot, parseSession, remapActionSeats, removeScreenshot, sequenceObservations,
@@ -17,20 +21,23 @@ import {
 } from '../reconstruction/session.js';
 import {
   MAX_SCREENSHOTS,
-  type Checkpoint, type HandObservation, type Interval, type IntervalResolution, type ManualActionType,
-  type ReconstructionResult, type ReconstructionSession, type ScreenshotEntry, type StateDifference,
+  type Checkpoint, type FrameSource, type HandObservation, type HiddenMark, type IdentityOverride, type Interval, type IntervalResolution,
+  type ManualActionType, type ReconstructionResult, type ReconstructionSession, type ScreenshotEntry, type StateDifference,
 } from '../reconstruction/types.js';
 import { claudeScreenshotProvider, fixtureProvider, type ScreenshotProvider } from '../vision/providers.js';
 import { drawTable } from '../vision/screenshot-fixtures.js';
 import { seatMoveMap, type ScreenshotRecognition } from '../vision/screenshot.js';
+import { DEFAULT_INTERVAL_MS, formatVideoTime, INTERVAL_CHOICES_MS, sampleTimes, videoProblem } from '../vision/video.js';
 import { loadHands } from './hand-store.js';
-import { decodeImage, fileProblem, jpegDataUrlToBlob, prepareUpload, svgToPng } from './image.js';
+import { decodeImage, fileProblem, jpegDataUrlToBlob, prepareUpload, svgToPng, UPLOAD_LONG_EDGE } from './image.js';
 import { renderRecognitionEditor } from './recognition-editor.js';
 import { loadReconstructions, saveReconstructions } from './reconstruction-store.js';
 import type { ReplayController } from './replay.js';
 import { renderBoard, renderSeats, type TableSeat } from './table-view.js';
+import { captureFrame, openVideo, type OpenVideo } from './video-frames.js';
 
 const MAX_IMPORT_BYTES = 40 * 1024 * 1024;
+const THUMB_EDGE = 240;
 
 function element<T extends HTMLElement>(id: string): T {
   const node = document.getElementById(id);
@@ -63,10 +70,18 @@ interface Shot {
   provider: ScreenshotProvider | null;
 }
 
+interface FrameMeta {
+  readonly source: FrameSource;
+  readonly timestampMs?: number;
+}
+
 const STATUS_LABELS: Record<Interval['status'], string> = {
   unchanged: 'No change', verified: 'Verified', unresolved: 'Unresolved', acknowledged: 'Left unresolved',
   resolved: 'Resolved', partial: 'Partly resolved', contradiction: 'Contradiction', 'different-hands': 'Different hands',
 };
+const BASIS_LABELS = {
+  user: 'matched by you', name: 'matched by name', hero: 'your seat', position: 'matched by seat position', new: 'first seen here', unmatched: 'not matched',
+} as const;
 
 export function initReconstruction(options: { replay: ReplayController }) {
   const status = element('recon-status');
@@ -75,6 +90,7 @@ export function initReconstruction(options: { replay: ReplayController }) {
   const clearButton = element<HTMLButtonElement>('recon-clear');
   const uploadOrderButton = element<HTMLButtonElement>('recon-upload-order');
   const fileInput = element<HTMLInputElement>('recon-file');
+  const videoInput = element<HTMLInputElement>('recon-video');
   const sample = element<HTMLSelectElement>('recon-sample');
   const drop = element('recon-drop');
   const list = element('recon-list');
@@ -96,14 +112,17 @@ export function initReconstruction(options: { replay: ReplayController }) {
   let shots: Shot[] = [];
   const observations = new Map<string, HandObservation>();
   let resolutions: IntervalResolution[] = [];
+  let overrides: IdentityOverride[] = [];
+  let hidden: HiddenMark[] = [];
   let result: ReconstructionResult = reconstructHand([]);
+  let steps: ReplayStep[] = [];
+  /** The replay step shown; `null` shows the selected frame. */
+  let stepIndex: number | null = null;
   let selected: string | null = null;
   let editing = false;
-  /** Stepping through confirmed actions of the interval ending at the selected screenshot. */
-  let actionStep: number | null = null;
   let session = newSession();
   let dirty = false;
-  let lastTable: { observation: HandObservation | undefined; step: number | null; interval: Interval | undefined } | null = null;
+  let lastTable: { observation: HandObservation | undefined; step: ReplayStep | null; label: string } | null = null;
   let counter = 0;
   let renaming: string | null = null;
 
@@ -115,6 +134,7 @@ export function initReconstruction(options: { replay: ReplayController }) {
   const entries = () => shots.map(s => s.entry);
   const shotById = (id: string) => shots.find(s => s.entry.id === id);
   const indexOf = (id: string) => shots.findIndex(s => s.entry.id === id);
+  const frameName = (entry: ScreenshotEntry, i: number) => 'Frame ' + (i + 1) + (entry.timestampMs !== undefined ? ' (' + formatVideoTime(entry.timestampMs) + ')' : '');
 
   // -------------------------------------------------------------------------
   // Recognition queue
@@ -129,8 +149,10 @@ export function initReconstruction(options: { replay: ReplayController }) {
       return shot.provider.recognize(upload, signal);
     },
     onRecognized: (id, recognition) => {
-      if (!shotById(id) || observations.has(id)) return;
-      observations.set(id, createObservation(id, indexOf(id), recognition));
+      const shot = shotById(id);
+      // A late reply for a removed frame, or one already recognized (and maybe corrected), is dropped.
+      if (!shot || observations.has(id)) return;
+      observations.set(id, createObservation(id, indexOf(id), recognition, { source: shot.entry.source ?? 'screenshot', timestampMs: shot.entry.timestampMs ?? null }));
       selected ??= id;
       dirty = true;
       refresh();
@@ -142,13 +164,13 @@ export function initReconstruction(options: { replay: ReplayController }) {
   });
 
   // -------------------------------------------------------------------------
-  // Adding screenshots
+  // Adding frames
   // -------------------------------------------------------------------------
-  async function addFiles(files: readonly File[], providerFor: (file: File, i: number) => ScreenshotProvider) {
+  async function addFiles(files: readonly File[], providerFor: (file: File, i: number) => ScreenshotProvider, metaFor: (i: number) => FrameMeta = () => ({ source: 'screenshot' })) {
     const room = MAX_SCREENSHOTS - shots.length;
     const problems: string[] = [];
-    if (files.length > room) problems.push((files.length - Math.max(room, 0)) + ' file(s) skipped: a reconstruction holds at most ' + MAX_SCREENSHOTS + ' screenshots.');
-    const accepted: { file: File; bitmap: ImageBitmap; provider: ScreenshotProvider }[] = [];
+    if (files.length > room) problems.push((files.length - Math.max(room, 0)) + ' file(s) skipped: a tracked hand holds at most ' + MAX_SCREENSHOTS + ' frames.');
+    const accepted: { file: File; bitmap: ImageBitmap; provider: ScreenshotProvider; meta: FrameMeta }[] = [];
     status.textContent = 'Opening the images on this device…';
     let i = 0;
     for (const file of files.slice(0, Math.max(room, 0))) {
@@ -159,21 +181,27 @@ export function initReconstruction(options: { replay: ReplayController }) {
         continue;
       }
       try {
-        accepted.push({ file, bitmap: await decodeImage(file), provider: providerFor(file, i) });
+        accepted.push({ file, bitmap: await decodeImage(file), provider: providerFor(file, i), meta: metaFor(i) });
       } catch (error) {
         problems.push(file.name + ': ' + (error instanceof Error ? error.message : 'could not be opened.'));
       }
       i++;
     }
     const { added } = addScreenshots(entries(), accepted.map(a => a.file.name), makeId);
-    added.forEach((entry, k) => {
+    added.forEach((base, k) => {
       const a = accepted[k];
+      const entry: ScreenshotEntry = {
+        ...base,
+        ...(a.meta.source === 'video' ? { source: 'video' as const } : {}),
+        ...(a.meta.timestampMs !== undefined ? { timestampMs: a.meta.timestampMs } : {}),
+      };
       shots.push({ entry, url: URL.createObjectURL(a.file), objectUrl: true, bitmap: a.bitmap, provider: a.provider });
     });
     if (added.length) dirty = true;
-    status.textContent = (added.length ? added.length + ' screenshot' + (added.length === 1 ? '' : 's') + ' added. ' : '')
-      + problems.join(' ') + (added.length ? ' Check the order, then press Read screenshots.' : '');
+    status.textContent = (added.length ? added.length + ' frame' + (added.length === 1 ? '' : 's') + ' added. ' : '')
+      + problems.join(' ') + (added.length ? ' Check the order, then press Read frames.' : '');
     refresh();
+    return added.map(e => e.id);
   }
 
   fileInput.addEventListener('change', () => {
@@ -190,7 +218,10 @@ export function initReconstruction(options: { replay: ReplayController }) {
     event.preventDefault();
     drop.classList.remove('dragging');
     const files = [...(event.dataTransfer?.files ?? [])];
-    if (files.length) void addFiles(files, () => claudeScreenshotProvider());
+    const video = files.find(f => f.type.startsWith('video/'));
+    if (video) void startVideo(video);
+    const images = files.filter(f => !f.type.startsWith('video/'));
+    if (images.length) void addFiles(images, () => claudeScreenshotProvider());
   });
   drop.addEventListener('keydown', event => {
     if (event.key === 'Enter' || event.key === ' ') {
@@ -199,21 +230,42 @@ export function initReconstruction(options: { replay: ReplayController }) {
     }
   });
 
+  async function loadSequence(seq: SequenceFixture) {
+    if (shots.length && dirty && !confirm('Replace the current frames with “' + seq.label + '”?')) return false;
+    reset();
+    try {
+      const files = await Promise.all(seq.frames.map((f, i) => svgToPng(drawTable(f.table), seq.id + '-' + (i + 1) + '.png')));
+      const ids = await addFiles(files, (_file, i) => fixtureProvider(seq.frames[i].response, 'sample:' + seq.frames[i].id));
+      session.title = seq.label;
+      return ids;
+    } catch (error) {
+      status.textContent = error instanceof Error ? error.message : 'The sample could not be drawn.';
+      return false;
+    }
+  }
+
   sample.addEventListener('change', async () => {
     const seq = sequenceById(sample.value);
     sample.value = '';
     if (!seq) return;
-    if (shots.length && !confirm('Replace the current screenshots with the sample “' + seq.label + '”?')) return;
-    reset();
-    try {
-      const files = await Promise.all(seq.frames.map((f, i) => svgToPng(drawTable(f.table), seq.id + '-' + (i + 1) + '.png')));
-      await addFiles(files, (_file, i) => fixtureProvider(seq.frames[i].response, 'sample:' + seq.frames[i].id));
-      session.title = seq.label;
-      status.textContent = 'Sample loaded: ' + seq.description + ' Press Read screenshots; samples use stored results and make no API calls.';
+    if (await loadSequence(seq)) {
+      status.textContent = 'Sample loaded: ' + seq.description + ' Press Read frames; samples use stored results and make no API calls.';
       refresh();
-    } catch (error) {
-      status.textContent = error instanceof Error ? error.message : 'The sample could not be drawn.';
     }
+  });
+
+  element('recon-demo').addEventListener('click', async () => {
+    const ids = await loadSequence(DEMO_SEQUENCE);
+    if (!ids) return;
+    // The demo's flop actions arrive as confirmed by the user; every other gap stays unresolved.
+    const at = new Date().toISOString();
+    const k = DEMO_CONFIRMED_ACTIONS.intervalIndex;
+    resolutions = [{
+      from: 'obs-' + ids[k], to: 'obs-' + ids[k + 1], mark: 'none',
+      actions: DEMO_CONFIRMED_ACTIONS.actions.map((a, n) => ({ id: 'demo-act-' + (n + 1), ...a, confirmedAt: at })),
+    }];
+    queue.enqueue(ids);
+    status.textContent = 'Demo loaded and read from stored results (no API call). ' + DEMO_SEQUENCE.description;
   });
 
   readButton.addEventListener('click', () => {
@@ -224,23 +276,23 @@ export function initReconstruction(options: { replay: ReplayController }) {
     }
     queue.enqueue(ids);
     status.textContent = shots.some(s => s.provider?.id === 'claude' && ids.includes(s.entry.id))
-      ? 'Reading with Claude, two at a time. Each screenshot can take up to a minute.'
+      ? 'Reading with Claude, two at a time. Each frame can take up to a minute.'
       : 'Reading…';
   });
   cancelButton.addEventListener('click', () => {
     queue.cancelAll();
-    status.textContent = 'Stopped. Screenshots already read are kept; press Read screenshots to continue.';
+    status.textContent = 'Stopped. Frames already read are kept; press Read frames to continue.';
     refresh();
   });
   clearButton.addEventListener('click', () => {
-    if (dirty && !confirm('Start over? Unsaved screenshots, corrections, and confirmed actions will be lost.')) return;
+    if (dirty && !confirm('Start over? Unsaved frames, corrections, player matches, and confirmed actions will be lost.')) return;
     reset();
     status.textContent = 'Cleared.';
     refresh();
   });
   uploadOrderButton.addEventListener('click', () => {
     reorder(uploadOrder(entries()));
-    status.textContent = 'Restored the order the screenshots were added in.';
+    status.textContent = 'Restored the order the frames were added in.';
   });
 
   function releaseShot(shot: Shot) {
@@ -254,9 +306,11 @@ export function initReconstruction(options: { replay: ReplayController }) {
     shots = [];
     observations.clear();
     resolutions = [];
+    overrides = [];
+    hidden = [];
     selected = null;
+    stepIndex = null;
     editing = false;
-    actionStep = null;
     session = newSession();
     dirty = false;
     lastTable = null;
@@ -268,7 +322,7 @@ export function initReconstruction(options: { replay: ReplayController }) {
   function reorder(next: readonly ScreenshotEntry[]) {
     shots = next.map(e => shotById(e.id)!).filter(Boolean);
     shots.forEach((s, i) => { s.entry = next[i]; });
-    actionStep = null;
+    stepIndex = null;
     dirty = true;
     refresh();
   }
@@ -276,14 +330,154 @@ export function initReconstruction(options: { replay: ReplayController }) {
   function remove(id: string) {
     const shot = shotById(id);
     if (!shot) return;
-    if (observations.get(id)?.reviewStatus === 'corrected' && !confirm('Remove this screenshot and your corrections to it?')) return;
+    if (observations.get(id)?.reviewStatus === 'corrected' && !confirm('Remove this frame and your corrections to it?')) return;
     queue.remove(id);
     releaseShot(shot);
     shots = shots.filter(s => s !== shot);
     observations.delete(id);
     if (selected === id) selected = shots.find(s => observations.has(s.entry.id))?.entry.id ?? null;
+    stepIndex = null;
     dirty = true;
     refresh();
+  }
+
+  // -------------------------------------------------------------------------
+  // Video frames
+  // -------------------------------------------------------------------------
+  const videoPanel = element('recon-video-panel');
+  const videoFrames = element('recon-video-frames');
+  const videoStatus = element('recon-video-status');
+  const intervalSelect = element<HTMLSelectElement>('recon-video-interval');
+  for (const ms of INTERVAL_CHOICES_MS) {
+    const option = add(intervalSelect, 'option', 'Every ' + (ms < 1000 ? ms / 1000 : ms / 1000) + ' s');
+    option.value = String(ms);
+  }
+  intervalSelect.value = String(DEFAULT_INTERVAL_MS);
+  let video: { open: OpenVideo; name: string; thumbs: { timeMs: number; url: string; selected: boolean }[] } | null = null;
+  let videoJob: AbortController | null = null;
+
+  function closeVideo() {
+    videoJob?.abort();
+    videoJob = null;
+    if (video) {
+      for (const t of video.thumbs) URL.revokeObjectURL(t.url);
+      video.open.close();
+    }
+    video = null;
+    videoFrames.replaceChildren();
+    videoPanel.hidden = true;
+  }
+
+  async function startVideo(file: File) {
+    const problem = videoProblem(file);
+    if (problem) {
+      status.textContent = file.name + ': ' + problem;
+      return;
+    }
+    closeVideo();
+    videoPanel.hidden = false;
+    videoStatus.textContent = 'Opening the video on this device…';
+    try {
+      const open = await openVideo(file);
+      video = { open, name: file.name, thumbs: [] };
+      element('recon-video-caption').textContent = file.name + ' · ' + formatVideoTime(open.durationMs) + ' · ' + open.width + '×' + open.height;
+      videoStatus.textContent = 'Choose how often to sample, then press Sample frames. Nothing is uploaded until you read the frames you add.';
+      renderVideo();
+    } catch (error) {
+      videoStatus.textContent = error instanceof Error ? error.message : 'This video could not be opened.';
+    }
+  }
+
+  videoInput.addEventListener('change', () => {
+    const file = videoInput.files?.[0];
+    videoInput.value = '';
+    if (file) void startVideo(file);
+  });
+  element('recon-video-close').addEventListener('click', closeVideo);
+  element('recon-video-cancel').addEventListener('click', () => {
+    videoJob?.abort();
+    videoStatus.textContent = 'Sampling stopped. The frames sampled so far are kept.';
+  });
+
+  element('recon-video-sample').addEventListener('click', async () => {
+    if (!video) return;
+    const current = video;
+    videoJob?.abort();
+    const job = new AbortController();
+    videoJob = job;
+    for (const t of current.thumbs) URL.revokeObjectURL(t.url);
+    current.thumbs = [];
+    const { times, intervalMs, capped } = sampleTimes(current.open.durationMs, Number(intervalSelect.value));
+    element<HTMLButtonElement>('recon-video-cancel').hidden = false;
+    for (let k = 0; k < times.length; k++) {
+      if (job.signal.aborted || video !== current) break;
+      videoStatus.textContent = 'Sampling frame ' + (k + 1) + ' of ' + times.length + '…';
+      try {
+        const blob = await captureFrame(current.open, times[k], THUMB_EDGE, job.signal);
+        current.thumbs.push({ timeMs: times[k], url: URL.createObjectURL(blob), selected: false });
+        renderVideo();
+      } catch (error) {
+        if (!job.signal.aborted) videoStatus.textContent = error instanceof Error ? error.message : 'A frame could not be read.';
+        break;
+      }
+    }
+    if (videoJob === job) {
+      videoJob = null;
+      element<HTMLButtonElement>('recon-video-cancel').hidden = true;
+      if (!job.signal.aborted) {
+        videoStatus.textContent = current.thumbs.length + ' frames sampled' + (capped ? ' (every ' + intervalMs / 1000 + ' s, to stay under ' + times.length + ')' : '')
+          + '. Tick the frames that show each moment you want, then add them. Only those will be read.';
+      }
+    }
+  });
+
+  element('recon-video-add').addEventListener('click', async () => {
+    if (!video) return;
+    const current = video;
+    const chosen = current.thumbs.filter(t => t.selected).sort((a, b) => a.timeMs - b.timeMs);
+    if (!chosen.length) return;
+    videoStatus.textContent = 'Copying ' + chosen.length + ' frame(s) at full size…';
+    const files: File[] = [];
+    try {
+      for (const t of chosen) {
+        const blob = await captureFrame(current.open, t.timeMs, UPLOAD_LONG_EDGE);
+        files.push(new File([blob], current.name + ' @ ' + formatVideoTime(t.timeMs) + '.jpg', { type: 'image/jpeg' }));
+      }
+    } catch (error) {
+      videoStatus.textContent = error instanceof Error ? error.message : 'A frame could not be copied.';
+      return;
+    }
+    const ids = await addFiles(files, () => claudeScreenshotProvider(), i => ({ source: 'video', timestampMs: chosen[i].timeMs }));
+    for (const t of chosen) t.selected = false;
+    renderVideo();
+    videoStatus.textContent = ids.length + ' frame(s) added to the list in video order. Pick more, or close the video.';
+  });
+
+  function renderVideo() {
+    videoFrames.replaceChildren();
+    if (!video) return;
+    for (const t of video.thumbs) {
+      const label = add(videoFrames, 'label', '', 'video-thumb' + (t.selected ? ' selected' : ''));
+      const box = add(label, 'input');
+      box.type = 'checkbox';
+      box.checked = t.selected;
+      box.addEventListener('change', () => {
+        t.selected = box.checked;
+        label.classList.toggle('selected', box.checked);
+        syncVideoAdd();
+      });
+      const img = add(label, 'img');
+      img.src = t.url;
+      img.alt = 'Video frame at ' + formatVideoTime(t.timeMs);
+      add(label, 'span', formatVideoTime(t.timeMs), 'fine-print');
+    }
+    syncVideoAdd();
+  }
+  function syncVideoAdd() {
+    const count = video?.thumbs.filter(t => t.selected).length ?? 0;
+    const addButton = element<HTMLButtonElement>('recon-video-add');
+    addButton.disabled = count === 0 || shots.length + count > MAX_SCREENSHOTS;
+    addButton.textContent = count ? 'Add ' + count + ' selected frame' + (count === 1 ? '' : 's') : 'Add selected frames';
   }
 
   // -------------------------------------------------------------------------
@@ -292,25 +486,47 @@ export function initReconstruction(options: { replay: ReplayController }) {
   function refresh() {
     const ordered = sequenceObservations(entries(), observations);
     for (const o of ordered) observations.set(o.screenshotId, o);
-    resolutions = liveResolutions(ordered, resolutions);
-    result = reconstructHand(ordered, { resolutions, screenshotCount: shots.length });
+    // Keep anything that refers to a frame still waiting to be read; drop what refers to removed frames,
+    // and resolutions whose two frames are no longer next to each other.
+    const ids = new Set(ordered.map(o => o.id));
+    const pending = new Set(shots.filter(s => !observations.has(s.entry.id)).map(s => 'obs-' + s.entry.id));
+    const live = new Set(liveResolutions(ordered, resolutions));
+    const waiting = (id: string) => pending.has(id);
+    resolutions = resolutions.filter(r => live.has(r) || ((waiting(r.from) || waiting(r.to)) && (ids.has(r.from) || waiting(r.from)) && (ids.has(r.to) || waiting(r.to))));
+    overrides = overrides.filter(o => ids.has(o.observationId) || waiting(o.observationId));
+    hidden = hidden.filter(h => ids.has(h.observationId) || waiting(h.observationId));
+    result = reconstructHand(ordered, { resolutions, screenshotCount: shots.length, identity: { overrides, hidden } });
+    steps = buildReplaySteps(result);
     if (selected && !observations.has(selected)) selected = ordered[0]?.screenshotId ?? null;
     if (!selected && ordered.length) selected = ordered[0].screenshotId;
+    if (stepIndex !== null && stepIndex >= steps.length) stepIndex = null;
     render();
   }
 
   const observationById = (id: string) => [...observations.values()].find(o => o.id === id);
   const selectedObservation = () => (selected ? observations.get(selected) : undefined);
   const selectedCheckpoint = () => result.checkpoints.findIndex(c => c.screenshotId === selected);
-  /** The interval that ends at the selected screenshot. */
-  const incomingInterval = () => {
-    const at = selectedCheckpoint();
-    return at > 0 ? result.intervals[at - 1] : undefined;
-  };
+  const playerLabel = (id: string | null) => (id ? result.identity.players.find(p => p.id === id)?.label ?? id : 'Unknown');
+  const frameIdentity = (observationId: string) => result.identity.frames.find(f => f.observationId === observationId);
 
   function select(id: string | null) {
-    if (id !== selected) actionStep = null;
     selected = id;
+    const o = id ? observations.get(id) : undefined;
+    stepIndex = o ? checkpointStep(steps, o.id) : null;
+    render();
+  }
+
+  function goStep(index: number) {
+    const step = steps[index];
+    if (!step) return;
+    stepIndex = index;
+    if (step.kind === 'checkpoint') {
+      selected = observationById(step.observationId)?.screenshotId ?? selected;
+    } else {
+      // Events and gaps sit after a frame: keep the later frame's changes in view.
+      const later = result.checkpoints[step.intervalIndex + 1];
+      if (later) selected = later.screenshotId;
+    }
     render();
   }
 
@@ -338,7 +554,7 @@ export function initReconstruction(options: { replay: ReplayController }) {
     const unread = shots.filter(s => !observations.has(s.entry.id)).length;
     const readable = shots.filter(s => !observations.has(s.entry.id) && s.bitmap).length;
     readButton.disabled = queue.busy || readable === 0;
-    readButton.textContent = readable && readable < shots.length ? 'Read ' + readable + ' remaining' : 'Read screenshots';
+    readButton.textContent = readable && readable < shots.length ? 'Read ' + readable + ' remaining' : 'Read frames';
     cancelButton.hidden = !queue.busy;
     drop.classList.toggle('busy', queue.busy);
     const box = element('recon-progress');
@@ -347,7 +563,7 @@ export function initReconstruction(options: { replay: ReplayController }) {
     const needReview = result.checkpoints.filter(c => c.reviewStatus === 'pending' || c.reviewCount > 0 || c.contradictions.length).length;
     const processing = progress.processing.map(id => '#' + (indexOf(id) + 1)).join(', ');
     const rows: [string, string][] = [
-      ['Screenshots', String(shots.length)],
+      ['Frames', String(shots.length)],
       ['Read', String(shots.length - unread)],
       ['Reading now', processing || '—'],
       ['Need review', String(needReview)],
@@ -359,7 +575,7 @@ export function initReconstruction(options: { replay: ReplayController }) {
       add(row, 'dd', v);
     }
     if (!queue.busy && progress.total && status.textContent?.startsWith('Reading')) {
-      status.textContent = 'Done reading. ' + (progress.failed ? progress.failed + ' failed; use Retry on each.' : 'Review each screenshot, then check the changes.');
+      status.textContent = 'Done reading. ' + (progress.failed ? progress.failed + ' failed; use Retry on each.' : 'Review each frame, then check the changes.');
     }
   }
 
@@ -368,9 +584,9 @@ export function initReconstruction(options: { replay: ReplayController }) {
     if (o) {
       const cp = result.checkpoints.find(c => c.screenshotId === id);
       if (cp?.contradictions.length) return ['Conflict', 'error'];
-      if (o.reviewStatus === 'corrected') return ['Corrected', 'high'];
+      if (o.reviewStatus === 'corrected') return ['Corrected', 'corrected'];
       if (o.reviewStatus === 'reviewed') return ['Reviewed', 'high'];
-      return [cp?.reviewCount ? 'Needs review' : 'Recognized', 'review'];
+      return [cp?.reviewCount ? 'Needs review' : 'Unreviewed', 'review'];
     }
     const job = queue.status(id);
     if (!job) return [shotById(id)?.bitmap ? 'Not read yet' : 'Image not saved', 'unknown'];
@@ -403,37 +619,43 @@ export function initReconstruction(options: { replay: ReplayController }) {
         const img = add(open, 'img', '', 'recon-thumb');
         img.src = shot.url;
         img.alt = '';
+        img.loading = 'lazy';
       } else {
         add(open, 'span', 'No image', 'recon-thumb placeholder');
       }
       const text = add(open, 'span', '', 'recon-item-text');
-      add(text, 'strong', '#' + (i + 1));
+      add(text, 'strong', '#' + (i + 1) + (shot.entry.timestampMs !== undefined ? ' · ' + formatVideoTime(shot.entry.timestampMs) : ''));
       add(text, 'span', shot.entry.label, 'recon-label');
       const [label, level] = jobLabel(id);
       add(text, 'span', label, 'indicator ind-' + level);
-      open.setAttribute('aria-label', 'Screenshot ' + (i + 1) + ', ' + shot.entry.label + ', ' + label + (open.disabled ? '' : '. Show on the table.'));
+      const o = observations.get(id);
+      const issues = o ? result.identity.issues.filter(x => x.observationId === o.id && x.kind !== 'missing').length : 0;
+      if (issues) add(text, 'span', issues + ' player match' + (issues === 1 ? '' : 'es') + ' to settle', 'indicator ind-low');
+      open.setAttribute('aria-label', frameName(shot.entry, i) + ', ' + shot.entry.label + ', ' + label + (open.disabled ? '' : '. Show on the table.'));
       const job = queue.status(id);
       if (job?.status === 'failed') add(item, 'p', job.error ?? 'Recognition failed.', 'fine-print issue-error');
       const tools = add(item, 'div', '', 'actions small-actions');
-      const up = button(tools, '↑', 'secondary', 'Move screenshot ' + (i + 1) + ' earlier');
+      const up = button(tools, '↑', 'secondary', 'Move frame ' + (i + 1) + ' earlier');
       up.disabled = i === 0;
       up.addEventListener('click', () => reorder(moveScreenshot(entries(), id, i - 1)));
-      const down = button(tools, '↓', 'secondary', 'Move screenshot ' + (i + 1) + ' later');
+      const down = button(tools, '↓', 'secondary', 'Move frame ' + (i + 1) + ' later');
       down.disabled = i === shots.length - 1;
       down.addEventListener('click', () => reorder(moveScreenshot(entries(), id, i + 1)));
       if (job && (job.status === 'failed' || job.status === 'cancelled') && shot.bitmap) {
-        const retry = button(tools, 'Retry', 'secondary', 'Retry screenshot ' + (i + 1));
+        const retry = button(tools, 'Retry', 'secondary', 'Retry frame ' + (i + 1));
         retry.addEventListener('click', () => {
           queue.retry(id);
-          status.textContent = 'Reading screenshot ' + (i + 1) + ' again…';
+          status.textContent = 'Reading frame ' + (i + 1) + ' again…';
         });
       }
-      const del = button(tools, 'Remove', 'secondary', 'Remove screenshot ' + (i + 1));
+      const del = button(tools, 'Remove', 'secondary', 'Remove frame ' + (i + 1));
       del.addEventListener('click', () => remove(id));
     });
   }
 
-  function observedSeats(rec: ScreenshotRecognition): TableSeat[] {
+  function observedSeats(o: HandObservation): TableSeat[] {
+    const rec = o.recognition;
+    const frame = frameIdentity(o.id);
     return rec.players.map((p, i) => {
       const badges: string[] = [];
       if (rec.dealerSeat.value === i) badges.push('Dealer');
@@ -441,14 +663,18 @@ export function initReconstruction(options: { replay: ReplayController }) {
       if (p.status.value === 'folded') badges.push('Folded');
       else if (p.status.value === null) badges.push('Status ?');
       else if (p.stack.value === 0) badges.push('All-in');
+      const match = frame?.seats[i];
+      if (match && !match.playerId) badges.push('Unmatched');
       const edited: string[] = [];
       if (p.name.source === 'corrected') edited.push('name');
       if (p.stack.source === 'corrected') edited.push('stack');
       if (p.bet.source === 'corrected') edited.push('bet');
       if (p.status.source === 'corrected') edited.push('status');
       if (p.cards.some(c => c.source === 'corrected')) edited.push('cards');
+      // A seat without a readable name shows the tracked player it was matched to.
+      const name = p.name.value ?? (match?.playerId ? playerLabel(match.playerId) + ' (' + BASIS_LABELS[match.basis] + ')' : seatName(rec, i));
       return {
-        name: seatName(rec, i), badges,
+        name, badges,
         status: p.status.value === 'folded' ? 'folded' : p.status.value === null ? 'unknown' : p.stack.value === 0 ? 'all-in' : 'active',
         cards: p.cards.map(c => c.value), stack: p.stack.value, bet: p.bet.value, edited,
       };
@@ -458,7 +684,7 @@ export function initReconstruction(options: { replay: ReplayController }) {
   function stateSeats(state: GameState): TableSeat[] {
     return state.players.map(p => ({
       name: p.name,
-      badges: [...(p.status === 'folded' ? ['Folded'] : p.status === 'all-in' ? ['All-in'] : [])],
+      badges: [...(p.seat === state.dealer ? ['Dealer'] : []), ...(p.status === 'folded' ? ['Folded'] : p.status === 'all-in' ? ['All-in'] : [])],
       status: p.status, cards: p.cards, stack: p.stack, bet: p.committed,
     }));
   }
@@ -472,21 +698,40 @@ export function initReconstruction(options: { replay: ReplayController }) {
 
   function renderTable() {
     const observation = selectedObservation();
-    const interval = incomingInterval();
-    const key = { observation, step: actionStep, interval };
-    // Redraw only when the shown state changes: a new observation object, or another action step.
-    if (lastTable && lastTable.observation === key.observation && lastTable.step === key.step && (key.step === null || lastTable.interval === key.interval)) return;
-    lastTable = key;
-    const steps = element('recon-steps');
-    steps.replaceChildren();
-    steps.hidden = true;
+    const step = stepIndex === null ? null : steps[stepIndex] ?? null;
+    const label = step?.label ?? '';
+    // Redraw only when what is shown changes: another observation object or another replay step.
+    if (lastTable && lastTable.observation === observation && lastTable.step === step && lastTable.label === label) return;
+    lastTable = { observation, step, label };
     const title = element('recon-table-title');
     const note = element('recon-table-note');
+    const kind = element('recon-step-kind');
     editButton.hidden = !observation;
     reviewedButton.hidden = !observation || observation.reviewStatus !== 'pending';
+    kind.textContent = step ? STEP_KIND_LABELS[step.kind] : '';
+    kind.className = 'step-kind' + (step ? ' kind-' + step.kind : '');
+    if (step?.kind === 'event') {
+      // A verified event, replayed through the hand engine's states.
+      const interval = result.intervals[step.intervalIndex];
+      const state = step.state;
+      title.textContent = 'After: ' + step.label;
+      note.textContent = 'Verified event ' + (step.eventIndex + 1) + ' of ' + (interval.actionCheck?.events.length ?? 0)
+        + ' between frames ' + (step.intervalIndex + 1) + ' and ' + (step.intervalIndex + 2) + '. Only actions you confirmed are replayed.';
+      renderSeats(element('recon-seats-top'), element('recon-seats-bottom'), stateSeats(state));
+      element('recon-felt').dataset.seats = String(state.players.length);
+      renderBoard(element('recon-board'), state.board);
+      element('recon-phase').textContent = state.street[0].toUpperCase() + state.street.slice(1);
+      const start = observationById(interval.from);
+      const startMiddle = start ? middleChips(start.recognition) : null;
+      const states = interval.actionCheck!.states;
+      const put = states[0].players.reduce((s, p) => s + p.stack, 0) - state.players.reduce((s, p) => s + p.stack, 0);
+      element('recon-pot').textContent = startMiddle === null ? 'Middle unknown' : 'Middle ' + (startMiddle + put).toLocaleString();
+      element('recon-pot').classList.remove('edited');
+      return;
+    }
     if (!observation) {
       title.textContent = 'Table';
-      note.textContent = shots.length ? 'Read the screenshots to see each recognized state here.' : '';
+      note.textContent = shots.length ? 'Read the frames to see each recognized state here.' : '';
       renderSeats(element('recon-seats-top'), element('recon-seats-bottom'), []);
       renderBoard(element('recon-board'), []);
       element('recon-phase').textContent = '';
@@ -496,36 +741,13 @@ export function initReconstruction(options: { replay: ReplayController }) {
     const rec = observation.recognition;
     const at = indexOf(observation.screenshotId);
     const cp = result.checkpoints.find(c => c.screenshotId === observation.screenshotId)!;
-    const states = interval?.actionCheck?.states ?? [];
-    if (actionStep !== null && interval && states.length > 1) {
-      // Stepping through confirmed actions from the previous screenshot.
-      const step = Math.min(actionStep, states.length - 1);
-      const state = states[step];
-      title.textContent = 'Confirmed actions before screenshot ' + (at + 1);
-      note.textContent = step === 0 ? 'Start: the state in the previous screenshot.' : 'After ' + describeAction(interval, Math.min(step - 1, interval.resolution!.actions.length - 1)) + '. Only actions you confirmed are shown.';
-      renderSeats(element('recon-seats-top'), element('recon-seats-bottom'), stateSeats(state));
-      renderBoard(element('recon-board'), state.board);
-      element('recon-phase').textContent = state.street[0].toUpperCase() + state.street.slice(1) + ' · step ' + step + ' of ' + (states.length - 1);
-      const start = observationById(interval.from);
-      const startMiddle = start ? middleChips(start.recognition) : null;
-      const put = states[0].players.reduce((s, p) => s + p.stack, 0) - state.players.reduce((s, p) => s + p.stack, 0);
-      element('recon-pot').textContent = startMiddle === null ? 'Middle unknown' : 'Middle ' + (startMiddle + put).toLocaleString();
-      steps.hidden = false;
-      const prev = button(steps, '◀ Step', 'secondary', 'Previous confirmed action');
-      prev.disabled = step === 0;
-      prev.addEventListener('click', () => { actionStep = step - 1; renderTable(); });
-      const next = button(steps, 'Step ▶', 'secondary', 'Next confirmed action');
-      next.disabled = step === states.length - 1;
-      next.addEventListener('click', () => { actionStep = step + 1; renderTable(); });
-      const back = button(steps, 'Back to the screenshot', 'secondary');
-      back.addEventListener('click', () => { actionStep = null; renderTable(); });
-      return;
-    }
-    title.textContent = 'Screenshot ' + (at + 1) + (rec.street.value ? ' · ' + rec.street.value[0].toUpperCase() + rec.street.value.slice(1) : '');
-    const reviewText = { pending: 'Not reviewed yet', reviewed: 'Reviewed', corrected: 'Corrected by you' }[observation.reviewStatus];
-    note.textContent = reviewText + (cp.reviewCount ? ' · ' + cp.reviewCount + ' field' + (cp.reviewCount === 1 ? '' : 's') + ' to check' : '')
+    const shot = shotById(observation.screenshotId);
+    title.textContent = (shot ? frameName(shot.entry, at) : 'Frame ' + (at + 1)) + (rec.street.value ? ' · ' + rec.street.value[0].toUpperCase() + rec.street.value.slice(1) : '');
+    const reviewText = { pending: 'Unreviewed', reviewed: 'Reviewed', corrected: 'Corrected by you' }[observation.reviewStatus];
+    const gap = step && (step.kind === 'unresolved' || step.kind === 'split') ? step.label + ' ' : '';
+    note.textContent = gap + reviewText + (cp.reviewCount ? ' · ' + cp.reviewCount + ' field' + (cp.reviewCount === 1 ? '' : 's') + ' to check' : '')
       + ' · “?” is unknown; dotted underlines mark values you corrected.';
-    renderSeats(element('recon-seats-top'), element('recon-seats-bottom'), observedSeats(rec));
+    renderSeats(element('recon-seats-top'), element('recon-seats-bottom'), observedSeats(observation));
     element('recon-felt').dataset.seats = String(rec.players.length);
     renderBoard(element('recon-board'), rec.communityCards.map(c => c.value));
     element('recon-phase').textContent = rec.street.value
@@ -539,7 +761,7 @@ export function initReconstruction(options: { replay: ReplayController }) {
   function renderEditor() {
     const observation = selectedObservation();
     editButton.setAttribute('aria-expanded', String(editing && !!observation));
-    editButton.textContent = editing ? 'Close review' : 'Review and correct this screenshot';
+    editButton.textContent = editing ? 'Close review' : 'Review and correct this frame';
     editorBox.hidden = !editing || !observation;
     if (!observation || !editing) return;
     const shot = shotById(observation.screenshotId);
@@ -552,14 +774,17 @@ export function initReconstruction(options: { replay: ReplayController }) {
       img.removeAttribute('src');
     }
     editor.replaceChildren();
-    if (!shot?.url) add(editor, 'p', 'The image was not saved with this reconstruction; only the recognized state is available.', 'fine-print');
+    if (!shot?.url) add(editor, 'p', 'The image was not saved with this session; only the recognized state is available.', 'fine-print');
     renderRecognitionEditor(editor, observation.recognition, (next, info) => {
       const current = observations.get(observation.screenshotId);
       if (!current) return;
       if (info?.seatMove) {
-        // Confirmed actions name seats by position in this screenshot; keep them on the same players.
-        resolutions = remapActionSeats(resolutions, current.id, seatMoveMap(current.recognition.players.length, info.seatMove.from, info.seatMove.to));
+        // Actions and player matches name seats by position in this frame; keep them on the same players.
+        const map = seatMoveMap(current.recognition.players.length, info.seatMove.from, info.seatMove.to);
+        resolutions = remapActionSeats(resolutions, current.id, map);
+        overrides = remapOverrides(overrides, current.id, map);
       }
+      // Only this frame changes; the comparisons are recomputed from the stored observations, with no new recognition.
       observations.set(observation.screenshotId, withRecognition(current, next));
       dirty = true;
       refresh();
@@ -580,12 +805,12 @@ export function initReconstruction(options: { replay: ReplayController }) {
   });
 
   // -------------------------------------------------------------------------
-  // Detected changes and interval resolution
+  // Players, detected changes, and interval resolution
   // -------------------------------------------------------------------------
   const GROUPS: [string, (d: StateDifference) => boolean][] = [
     ['Community cards', d => d.kind.startsWith('board') || d.kind === 'street-changed' || d.kind === 'street-reversed'],
-    ['Pot and chips', d => d.kind === 'pot-changed' || d.kind === 'stack-changed' || d.kind === 'bet-changed' || (d.kind.startsWith('value-') && !d.field.startsWith('players.'))],
-    ['Players', d => d.kind.startsWith('hole') || d.kind === 'status-changed' || d.kind === 'unfolded' || d.kind.startsWith('seat') || d.kind === 'name-changed' || (d.kind.startsWith('value-') && d.field.startsWith('players.'))],
+    ['Pot and chips', d => d.kind === 'pot-changed' || d.kind === 'stack-changed' || d.kind === 'bet-changed' || d.kind === 'all-in' || (d.kind.startsWith('value-') && !d.field.startsWith('players.'))],
+    ['Players', d => d.kind.startsWith('hole') || d.kind === 'status-changed' || d.kind === 'unfolded' || d.kind.startsWith('seat') || d.kind.startsWith('player-') || d.kind === 'name-changed' || (d.kind.startsWith('value-') && d.field.startsWith('players.'))],
     ['Table', d => d.kind === 'dealer-moved' || d.kind === 'blinds-changed'],
   ];
 
@@ -593,39 +818,97 @@ export function initReconstruction(options: { replay: ReplayController }) {
     changes.replaceChildren();
     const at = selectedCheckpoint();
     if (at < 0) {
-      add(changes, 'p', 'Select a recognized screenshot to see what changed.', 'fine-print');
+      add(changes, 'p', 'Select a recognized frame to see what changed.', 'fine-print');
       return;
     }
     const cp = result.checkpoints[at];
+    renderPlayers(cp);
     if (cp.contradictions.length) {
       const box = add(changes, 'div', '', 'recon-block contradiction');
-      add(box, 'h4', 'Problems in this screenshot');
+      add(box, 'h4', 'Problems in this frame');
       const ul = add(box, 'ul');
       for (const c of cp.contradictions) add(ul, 'li', c.text);
     }
     const global = result.globalContradictions.filter(c => c.observationIds.includes(cp.observationId));
     if (global.length) {
       const box = add(changes, 'div', '', 'recon-block contradiction');
-      add(box, 'h4', 'Conflicts with other screenshots');
+      add(box, 'h4', 'Conflicts with other frames');
       const ul = add(box, 'ul');
       for (const c of global) add(ul, 'li', c.text);
     }
     const interval = at > 0 ? result.intervals[at - 1] : undefined;
     if (!interval) {
-      add(changes, 'p', 'This is the first screenshot. What it shows:', 'fine-print');
+      add(changes, 'p', 'This is the first frame. What it shows:', 'fine-print');
       const ul = add(changes, 'ul', '', 'recon-facts');
       for (const f of cp.confirmed) add(ul, 'li', f.text);
-      if (result.checkpoints.length > 1) add(changes, 'p', 'Select the next screenshot to see what changed after this one.', 'fine-print');
+      if (result.checkpoints.length > 1) add(changes, 'p', 'Select the next frame to see what changed after this one.', 'fine-print');
       return;
     }
     renderInterval(interval, at);
   }
 
+  /** Who is who in the selected frame, with controls to settle matches and absences. */
+  function renderPlayers(cp: Checkpoint) {
+    const frame = frameIdentity(cp.observationId);
+    const o = observationById(cp.observationId);
+    if (!frame || !o) return;
+    const box = add(changes, 'fieldset', '', 'review-section recon-players');
+    add(box, 'legend', 'Players in this frame');
+    const ul = add(box, 'ul', '', 'recon-player-list');
+    frame.seats.forEach(s => {
+      const li = add(ul, 'li', '', s.playerId ? '' : 'issue-review');
+      const seatLabel = o.recognition.players[s.seat].name.value ?? 'Seat ' + (s.seat + 1);
+      add(li, 'span', seatLabel + ' → ' + (s.playerId ? playerLabel(s.playerId) : 'not matched') + ' ');
+      add(li, 'span', BASIS_LABELS[s.basis], 'indicator ' + (s.basis === 'user' ? 'ind-corrected' : s.basis === 'unmatched' ? 'ind-low' : s.basis === 'position' ? 'ind-medium' : 'ind-high'));
+      // Let the user match this seat: any tracked player, someone new, or back to automatic.
+      const select = add(li, 'select');
+      select.setAttribute('aria-label', 'Match ' + seatLabel + ' in this frame to a player');
+      const options: [string, string][] = [['', s.basis === 'user' ? 'Automatic match' : 'Change match…']];
+      const known = result.identity.players.filter(p => result.identity.frames.findIndex(f => f.observationId === p.firstObservation) < result.identity.frames.indexOf(frame) || p.id === s.playerId);
+      const ranked = [...s.candidates, ...known.map(p => p.id).filter(id => !s.candidates.includes(id))];
+      for (const id of ranked) options.push([id, playerLabel(id)]);
+      options.push([NEW_PLAYER, 'Someone not seen before']);
+      for (const [value, text] of options) {
+        const option = add(select, 'option', text);
+        option.value = value;
+      }
+      select.value = '';
+      select.addEventListener('change', () => {
+        const value = select.value;
+        if (!value && s.basis !== 'user') return;
+        overrides = setOverride(overrides, cp.observationId, s.seat, value || null);
+        dirty = true;
+        refresh();
+        status.textContent = value ? 'Matched ' + seatLabel + ' in this frame. The comparisons were recomputed.' : 'Back to the automatic match for ' + seatLabel + '.';
+      });
+    });
+    for (const m of frame.missing) {
+      const li = add(ul, 'li', '', m.acknowledged ? '' : 'issue-review');
+      add(li, 'span', playerLabel(m.playerId) + (m.acknowledged ? ' is marked as not visible here (still in the hand). ' : ' is not visible here. That is not a fold. '));
+      const toggle = button(li, m.acknowledged ? 'Undo' : 'Mark as not visible', 'secondary link-button');
+      toggle.addEventListener('click', () => {
+        hidden = m.acknowledged
+          ? hidden.filter(h => !(h.observationId === cp.observationId && h.playerId === m.playerId))
+          : [...hidden, { observationId: cp.observationId, playerId: m.playerId }];
+        dirty = true;
+        refresh();
+      });
+    }
+    const conflicts = result.identity.issues.filter(x => x.observationId === cp.observationId && x.kind === 'conflict');
+    for (const c of conflicts) add(box, 'p', c.text, 'issue-error');
+    add(box, 'p', 'Matches use names, your seat, and seat positions relative to matched players. Nothing is merged on weak evidence.', 'fine-print');
+  }
+
   function renderInterval(interval: Interval, at: number) {
     const head = add(changes, 'div', '', 'recon-interval-head');
-    add(head, 'p', 'Since screenshot ' + at, 'fine-print');
+    add(head, 'p', 'Since frame ' + at, 'fine-print');
     add(head, 'span', STATUS_LABELS[interval.status], 'recon-status status-' + interval.status);
+    add(head, 'span', CONSISTENCY_LABELS[interval.consistency], 'recon-status consistency-' + interval.consistency);
     add(changes, 'p', interval.summary);
+    if (interval.consistencyReasons.length && interval.consistency !== 'contradictory') {
+      const ul = add(changes, 'ul', '', 'recon-facts fine-print');
+      for (const r of interval.consistencyReasons.slice(0, 4)) add(ul, 'li', r);
+    }
 
     if (interval.differentHandSigns.length && interval.status !== 'different-hands') {
       add(changes, 'p', 'These may be different hands: ' + interval.differentHandSigns.join(' '), 'recon-warn');
@@ -635,8 +918,10 @@ export function initReconstruction(options: { replay: ReplayController }) {
       add(box, 'h4', 'Contradictions');
       const ul = add(box, 'ul');
       for (const c of interval.contradictions) add(ul, 'li', c.text);
-      add(box, 'p', 'Correct the misread value in either screenshot, or mark them as different hands.', 'fine-print');
+      if (interval.consistencyReasons.some(r => r.includes('out of order'))) add(box, 'p', 'The frames may be out of order: try moving one.', 'fine-print');
+      add(box, 'p', 'Correct the misread value in either frame, or mark them as different hands.', 'fine-print');
     }
+    const userConfirmed = new Set(interval.resolution?.confirmedChanges ?? []);
     for (const [title, test] of GROUPS) {
       const items = interval.differences.filter(d => d.severity !== 'contradiction' && test(d));
       if (!items.length) continue;
@@ -645,22 +930,31 @@ export function initReconstruction(options: { replay: ReplayController }) {
       const ul = add(box, 'ul');
       for (const d of items) {
         const li = add(ul, 'li', d.label, d.severity === 'review' ? 'issue-review' : '');
-        const tags = [d.evidence === 'observed' ? 'observed' : d.evidence === 'corrected' ? 'includes your correction' : 'inferred'];
+        const key = differenceKey(d);
+        const confirmed = userConfirmed.has(key) || d.evidence === 'confirmed';
+        const tags = [confirmed ? 'confirmed' : d.evidence === 'inferred' ? 'inferred' : 'observed'];
         if (d.confidence.previous && d.confidence.next && (d.confidence.previous !== 'high' || d.confidence.next !== 'high')) tags.push('reader confidence ' + d.confidence.previous + ' → ' + d.confidence.next);
-        add(li, 'span', ' ' + tags.join(' · '), 'fine-print');
+        add(li, 'span', ' ' + tags.join(' · '), 'fine-print evidence-' + tags[0]);
         if (d.warning) add(li, 'span', ' ' + d.warning, 'fine-print');
+        if (d.evidence !== 'confirmed') {
+          const toggle = button(li, userConfirmed.has(key) ? 'Unconfirm' : 'Confirm', 'secondary link-button', (userConfirmed.has(key) ? 'Unconfirm: ' : 'Confirm: ') + d.label);
+          toggle.addEventListener('click', () => updateResolution(interval, r => ({
+            ...r,
+            confirmedChanges: userConfirmed.has(key) ? (r.confirmedChanges ?? []).filter(k => k !== key) : [...(r.confirmedChanges ?? []), key],
+          })));
+        }
       }
     }
     const confirmedExtra = interval.confirmed.filter(f => !interval.differences.some(d => d.label === f.text));
     if (confirmedExtra.length) {
       const box = add(changes, 'div', '', 'recon-block');
-      add(box, 'h4', 'Follows from the screenshots');
+      add(box, 'h4', 'Follows from the frames');
       const ul = add(box, 'ul');
       for (const f of confirmedExtra) add(ul, 'li', f.text);
     }
     if (interval.possible.length) {
       const box = add(changes, 'div', '', 'recon-block unresolved');
-      add(box, 'h4', 'Not determined by the screenshots');
+      add(box, 'h4', 'Not determined by the frames (inferred possibilities)');
       for (const p of interval.possible) {
         add(box, 'p', p.text);
         const ul = add(box, 'ul');
@@ -673,7 +967,6 @@ export function initReconstruction(options: { replay: ReplayController }) {
   function updateResolution(interval: Interval, change: (r: IntervalResolution) => IntervalResolution) {
     const current = interval.resolution ?? { from: interval.from, to: interval.to, mark: 'none' as const, actions: [] };
     resolutions = setResolution(resolutions, change(current));
-    actionStep = null;
     dirty = true;
     refresh();
   }
@@ -702,9 +995,10 @@ export function initReconstruction(options: { replay: ReplayController }) {
         const ul = add(box, 'ul');
         for (const u of check.unexplained) add(ul, 'li', u);
       }
-      if (check && check.states.length > 1) {
-        const step = button(box, 'Step through these actions on the table');
-        step.addEventListener('click', () => { actionStep = 0; renderTable(); element('recon-felt').scrollIntoView({ block: 'nearest' }); });
+      const first = steps.findIndex(s => s.kind === 'event' && s.intervalIndex === interval.fromIndex);
+      if (first >= 0) {
+        const replay = button(box, 'Replay these actions');
+        replay.addEventListener('click', () => { goStep(first); element('recon-felt').scrollIntoView({ block: 'nearest' }); });
       }
     }
 
@@ -759,14 +1053,14 @@ export function initReconstruction(options: { replay: ReplayController }) {
           }],
         }));
       });
-      add(box, 'p', 'Each action is checked by the hand rules: stack sizes, amounts to call, and minimum bets and raises. Turn order is not checked, because the screenshots do not show it.', 'fine-print');
+      add(box, 'p', 'Each action is checked by the hand rules: stack sizes, amounts to call, and minimum bets and raises. Turn order is not checked, because the frames do not show it.', 'fine-print');
     }
 
     const marks = add(box, 'div', '', 'actions small-actions');
     const unresolved = button(marks, res?.mark === 'unresolved' ? 'Undo “leave unresolved”' : 'Leave unresolved');
     unresolved.disabled = interval.status === 'contradiction' || interval.status === 'different-hands';
     unresolved.addEventListener('click', () => updateResolution(interval, r => ({ ...r, mark: r.mark === 'unresolved' ? 'none' : 'unresolved' })));
-    const split = button(marks, res?.mark === 'different-hands' ? 'Undo “different hands”' : 'These are different hands');
+    const split = button(marks, res?.mark === 'different-hands' ? 'Undo “separate hands”' : 'Split: these are separate hands');
     split.addEventListener('click', () => updateResolution(interval, r => ({ ...r, mark: r.mark === 'different-hands' ? 'none' : 'different-hands' })));
     const fix = button(marks, 'Correct values');
     fix.addEventListener('click', () => {
@@ -778,81 +1072,74 @@ export function initReconstruction(options: { replay: ReplayController }) {
     recheck.addEventListener('click', () => {
       refresh();
       const again = result.intervals.find(i => i.from === interval.from && i.to === interval.to);
-      status.textContent = 'Rechecked screenshots ' + (interval.fromIndex + 1) + '–' + (interval.fromIndex + 2) + ': ' + (again?.summary ?? '');
+      status.textContent = 'Rechecked frames ' + (interval.fromIndex + 1) + '–' + (interval.fromIndex + 2) + ': ' + (again ? CONSISTENCY_LABELS[again.consistency] + '. ' + again.summary : '');
     });
     add(box, 'p', 'You can save with intervals left unresolved.', 'fine-print');
   }
 
   // -------------------------------------------------------------------------
-  // Timeline
+  // Replay timeline: observed frames, verified events, and unresolved gaps
   // -------------------------------------------------------------------------
   function checkpointText(c: Checkpoint) {
-    const street = c.street ? c.street[0].toUpperCase() + c.street.slice(1) : 'Street unknown';
     const board = c.board.length ? c.board.map(x => x ?? '?').join(' ') : 'no board';
-    const stacks = c.stacks.map(s => s.label + ' ' + (s.folded ? 'folded' : s.stack === null ? '?' : s.stack)).join(', ');
-    return { title: 'Screenshot ' + (indexOf(c.screenshotId) + 1) + ' · ' + street, detail: board + ' · pot ' + (c.pot ?? '?') + ' · ' + stacks };
+    const frame = frameIdentity(c.observationId);
+    const o = observationById(c.observationId);
+    // Unreadable names show the tracked player.
+    const label = (s: Checkpoint['stacks'][number], i: number) => (o?.recognition.players[i]?.name.value || !frame?.seats[i]?.playerId ? s.label : playerLabel(frame.seats[i].playerId));
+    const stacks = c.stacks.map((s, i) => label(s, i) + ' ' + (s.folded ? 'folded' : s.stack === null ? '?' : s.stack)).join(', ');
+    return board + ' · pot ' + (c.pot ?? '?') + ' · ' + stacks;
   }
 
-  function go(position: number) {
-    const cp = result.checkpoints[position];
-    if (cp) select(cp.screenshotId);
-  }
+  const currentStep = () => {
+    if (stepIndex !== null) return stepIndex;
+    const o = selectedObservation();
+    return o ? Math.max(0, checkpointStep(steps, o.id)) : 0;
+  };
 
   function renderTimeline() {
-    const count = result.checkpoints.length;
-    const at = Math.max(0, selectedCheckpoint());
+    const count = steps.length;
+    const at = currentStep();
     scrub.max = String(Math.max(0, count - 1));
     scrub.value = String(at);
     scrub.disabled = count < 2;
-    element('recon-position').textContent = count ? (at + 1) + ' of ' + count : '';
-    scrub.setAttribute('aria-valuetext', 'Checkpoint ' + (at + 1) + ' of ' + count);
+    const step = steps[at];
+    element('recon-position').textContent = count ? (at + 1) + ' of ' + count + (step ? ' · ' + STEP_KIND_LABELS[step.kind] : '') : '';
+    scrub.setAttribute('aria-valuetext', 'Step ' + (at + 1) + ' of ' + count + (step ? ': ' + STEP_KIND_LABELS[step.kind] + ', ' + step.label : ''));
     element<HTMLButtonElement>('recon-first').disabled = at === 0;
     element<HTMLButtonElement>('recon-prev').disabled = at === 0;
     element<HTMLButtonElement>('recon-next').disabled = at >= count - 1;
     element<HTMLButtonElement>('recon-last').disabled = at >= count - 1;
     timeline.replaceChildren();
-    for (const entry of result.timeline) {
-      if (entry.kind === 'checkpoint') {
-        const c = entry.checkpoint;
-        const li = add(timeline, 'li', '', 'recon-tl-checkpoint');
-        const b = button(li, '', 'recon-tl-button' + (c.screenshotId === selected ? ' selected' : ''));
-        const { title, detail } = checkpointText(c);
-        add(b, 'strong', title);
-        add(b, 'span', detail, 'fine-print');
+    steps.forEach((s, index) => {
+      const li = add(timeline, 'li', '', 'recon-tl-' + s.kind);
+      const b = button(li, '', 'recon-tl-button' + (s.kind === 'checkpoint' ? '' : ' interval') + (index === at ? ' selected' : ''));
+      add(b, 'span', STEP_KIND_LABELS[s.kind], 'step-kind kind-' + s.kind);
+      if (s.kind === 'checkpoint') {
+        const c = result.checkpoints[s.checkpointIndex];
+        const shot = shotById(c.screenshotId);
+        add(b, 'strong', ' ' + (shot ? frameName(shot.entry, indexOf(c.screenshotId)) : s.label) + (c.street ? ' · ' + c.street : ''));
+        add(b, 'span', checkpointText(c), 'fine-print');
         const flags: string[] = [];
+        const before = result.intervals[s.checkpointIndex - 1];
+        if (before) flags.push(CONSISTENCY_LABELS[before.consistency] + ' with the previous frame');
         if (c.contradictions.length) flags.push(c.contradictions.length + ' problem(s)');
         if (c.reviewCount) flags.push(c.reviewCount + ' to check');
-        if (c.reviewStatus !== 'pending') flags.push(c.reviewStatus);
-        if (flags.length) add(b, 'span', flags.join(' · '), 'fine-print');
-        if (c.screenshotId === selected) b.setAttribute('aria-current', 'step');
-        b.addEventListener('click', () => select(c.screenshotId));
+        flags.push({ pending: 'unreviewed', reviewed: 'reviewed', corrected: 'corrected' }[c.reviewStatus]);
+        add(b, 'span', flags.join(' · '), 'fine-print');
       } else {
-        const i = entry.interval;
-        const li = add(timeline, 'li', '', 'recon-tl-interval status-' + i.status);
-        const b = button(li, '', 'recon-tl-button interval');
-        add(b, 'span', STATUS_LABELS[i.status], 'recon-status status-' + i.status);
-        add(b, 'span', ' ' + i.summary);
-        const details: string[] = [];
-        const changed = i.differences.filter(d => d.severity !== 'contradiction').length;
-        if (changed) details.push(changed + ' change(s)');
-        if (i.resolution?.actions.length) details.push(i.resolution.actions.length + ' confirmed action(s)');
-        if (i.contradictions.length) details.push(i.contradictions.length + ' contradiction(s)');
-        if (details.length) add(b, 'span', details.join(' · '), 'fine-print');
-        b.setAttribute('aria-label', 'Between screenshots ' + (i.fromIndex + 1) + ' and ' + (i.fromIndex + 2) + ': ' + STATUS_LABELS[i.status] + '. ' + i.summary);
-        b.addEventListener('click', () => {
-          const later = result.checkpoints[i.fromIndex + 1];
-          if (later) select(later.screenshotId);
-        });
+        add(b, 'span', ' ' + s.label);
       }
-    }
+      if (index === at) b.setAttribute('aria-current', 'step');
+      b.addEventListener('click', () => goStep(index));
+    });
   }
 
-  const nav = (move: 'first' | 'previous' | 'next' | 'last') => () => go(moveCursor(Math.max(0, selectedCheckpoint()), result.checkpoints.length - 1, move));
+  const nav = (move: 'first' | 'previous' | 'next' | 'last') => () => goStep(moveStep(currentStep(), steps, move));
   element('recon-first').addEventListener('click', nav('first'));
   element('recon-prev').addEventListener('click', nav('previous'));
   element('recon-next').addEventListener('click', nav('next'));
   element('recon-last').addEventListener('click', nav('last'));
-  scrub.addEventListener('input', () => go(moveCursor(0, result.checkpoints.length - 1, Number(scrub.value))));
+  scrub.addEventListener('input', () => goStep(moveStep(0, steps, Number(scrub.value))));
 
   // -------------------------------------------------------------------------
   // Summary, saving, export, and history matching
@@ -861,9 +1148,12 @@ export function initReconstruction(options: { replay: ReplayController }) {
     const m = result.metrics;
     const box = element('recon-metrics');
     box.replaceChildren();
+    const unsettled = result.identity.issues.filter(x => x.kind !== 'missing').length;
     const rows: [string, number][] = [
-      ['Screenshots', m.screenshots], ['Recognized checkpoints', m.checkpoints], ['Corrected fields', m.correctedFields],
+      ['Frames', m.screenshots], ['Recognized checkpoints', m.checkpoints], ['Tracked players', result.identity.players.length],
+      ['Player matches to settle', unsettled], ['Corrected fields', m.correctedFields],
       ['Verified transitions', m.verifiedTransitions], ['Unresolved intervals', m.unresolvedIntervals], ['Contradictions', m.contradictions],
+      ['Hands', result.hands.length],
     ];
     for (const [k, v] of rows) {
       const row = add(box, 'div');
@@ -875,8 +1165,7 @@ export function initReconstruction(options: { replay: ReplayController }) {
     for (const w of result.warnings) add(warn, 'li', w);
     warn.hidden = !result.warnings.length;
     if (document.activeElement !== nameInput) nameInput.value = session.title;
-    const imagesAvailable = shots.some(s => s.url);
-    keepImages.disabled = !imagesAvailable;
+    keepImages.disabled = !shots.some(s => s.url);
   }
   nameInput.addEventListener('change', () => {
     session.title = nameInput.value.trim();
@@ -900,17 +1189,19 @@ export function initReconstruction(options: { replay: ReplayController }) {
     const screenshots: ScreenshotEntry[] = [];
     for (const shot of shots) {
       const image = withImages ? await dataUrlFor(shot) : undefined;
-      screenshots.push({ id: shot.entry.id, label: shot.entry.label, uploadIndex: shot.entry.uploadIndex, ...(image ? { image } : {}) });
+      const { image: _old, ...entry } = shot.entry;
+      screenshots.push({ ...entry, ...(image ? { image } : {}) });
     }
     return createSession({
       id: session.id,
-      title: session.title || (result.checkpoints[0]?.street ? 'Hand from ' + result.checkpoints.length + ' screenshots' : 'Reconstruction'),
+      title: session.title || (result.checkpoints.length ? 'Hand from ' + result.checkpoints.length + ' frames' : 'Tracked hand'),
       createdAt: session.createdAt,
       updatedAt: new Date().toISOString(),
       screenshots,
       observations: sequenceObservations(entries(), observations),
       resolutions,
       imagesSaved: withImages,
+      identity: { overrides, hidden },
     });
   }
 
@@ -921,13 +1212,13 @@ export function initReconstruction(options: { replay: ReplayController }) {
     try {
       saveReconstructions([built, ...sessions.filter(s => s.id !== built.id)]);
     } catch (error) {
-      note.textContent = error instanceof Error ? error.message : 'The reconstruction could not be saved.';
+      note.textContent = error instanceof Error ? error.message : 'The session could not be saved.';
       return;
     }
     session.title = built.title;
     dirty = false;
-    note.textContent = 'Saved “' + built.title + '” in this browser'
-      + (built.imagesSaved ? ' with its images.' : '. Images were not saved: reopening restores the timeline and corrections, not the screenshots.');
+    note.textContent = 'Saved “' + built.title + '” in this browser: frame order, recognized states, corrections, player matches, confirmed actions, and checks.'
+      + (built.imagesSaved ? ' The images were saved too.' : ' The images and any video were not saved; reopening restores everything else.');
     renderSaved();
     renderSummary();
   });
@@ -942,12 +1233,12 @@ export function initReconstruction(options: { replay: ReplayController }) {
     link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
-  const fileName = (s: ReconstructionSession) => (s.title.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'reconstruction') + '.json';
+  const fileName = (s: ReconstructionSession) => (s.title.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'tracked-hand') + '.json';
 
   element('recon-export').addEventListener('click', async () => {
     const built = await buildSession();
     download(serializeSession(built), fileName(built));
-    element('recon-save-note').textContent = 'Exported' + (built.imagesSaved ? ' with images.' : ' without images.');
+    element('recon-save-note').textContent = 'Exported' + (built.imagesSaved ? ' with images.' : ' without images (metadata only).');
   });
 
   element('recon-match').addEventListener('click', () => {
@@ -955,7 +1246,7 @@ export function initReconstruction(options: { replay: ReplayController }) {
     out.replaceChildren();
     const ordered = sequenceObservations(entries(), observations);
     if (!ordered.length) {
-      add(out, 'p', 'Read at least one screenshot first.');
+      add(out, 'p', 'Read at least one frame first.');
       return;
     }
     const { hands, problems } = loadHands();
@@ -966,13 +1257,13 @@ export function initReconstruction(options: { replay: ReplayController }) {
     });
     if (problems.length) add(out, 'p', problems.join(' '), 'fine-print');
     if (!matches.length) {
-      add(out, 'p', hands.length ? 'No saved hand agrees with every screenshot in this order.' : 'There are no saved hands to compare with.');
+      add(out, 'p', hands.length ? 'No saved hand agrees with every frame in this order.' : 'There are no saved hands to compare with.');
       return;
     }
     for (const m of matches) {
       const row = add(out, 'div', '', 'actions');
-      add(row, 'p', '“' + m.hand.name + '” fits every screenshot, at events ' + m.positions.join(', ') + '.');
-      const open = button(row, 'Open at the selected screenshot');
+      add(row, 'p', '“' + m.hand.name + '” fits every frame, at events ' + m.positions.join(', ') + '.');
+      const open = button(row, 'Open at the selected frame');
       open.addEventListener('click', () => {
         const at = Math.max(0, selectedCheckpoint());
         options.replay.openHand(m.hand.id, m.positions[at] ?? m.positions[0]);
@@ -981,7 +1272,7 @@ export function initReconstruction(options: { replay: ReplayController }) {
   });
 
   // -------------------------------------------------------------------------
-  // Saved reconstructions
+  // Saved sessions
   // -------------------------------------------------------------------------
   function load(saved: ReconstructionSession) {
     reset();
@@ -992,12 +1283,14 @@ export function initReconstruction(options: { replay: ReplayController }) {
       queue.markDone(o.screenshotId);
     }
     resolutions = [...saved.resolutions];
+    overrides = [...saved.identity.overrides];
+    hidden = [...saved.identity.hidden];
     keepImages.checked = saved.imagesSaved;
     dirty = false;
     refresh();
-    status.textContent = 'Opened “' + saved.title + '”.' + (saved.imagesSaved ? '' : ' The images were not saved, so only the recognized states and your corrections are restored.');
+    status.textContent = 'Opened “' + saved.title + '”.' + (saved.imagesSaved ? '' : ' The images were not saved, so the recognized states, corrections, and matches are restored without the pictures.');
     if (saved.imagesSaved) {
-      // Decode saved images so they can be re-sent if a screenshot is still unread.
+      // Decode saved images so a frame that is still unread can be sent.
       for (const shot of shots) {
         if (!shot.url || observations.has(shot.entry.id)) continue;
         void Promise.resolve(shot.url).then(jpegDataUrlToBlob).then(decodeImage).then(bitmap => {
@@ -1051,11 +1344,11 @@ export function initReconstruction(options: { replay: ReplayController }) {
       }
       const open = button(item, s.title, 'hand-open');
       open.addEventListener('click', () => {
-        if (dirty && shots.length && !confirm('Open “' + s.title + '”? Unsaved changes to the current reconstruction will be lost.')) return;
+        if (dirty && shots.length && !confirm('Open “' + s.title + '”? Unsaved changes to the current session will be lost.')) return;
         load(s);
       });
-      add(item, 'p', new Date(s.updatedAt).toLocaleString() + ' · ' + s.screenshots.length + ' screenshots · ' + s.observations.length + ' read'
-        + (s.imagesSaved ? ' · images saved' : ' · no images'), 'hand-meta');
+      add(item, 'p', new Date(s.updatedAt).toLocaleString() + ' · ' + s.screenshots.length + ' frames (' + s.sourceType + ') · ' + s.observations.length + ' read'
+        + (s.imagesSaved ? ' · images saved' : ' · metadata only'), 'hand-meta');
       const tools = add(item, 'div', '', 'actions small-actions');
       const rename = button(tools, 'Rename', 'secondary', 'Rename ' + s.title);
       rename.addEventListener('click', () => { renaming = s.id; renderSaved(); });
@@ -1063,7 +1356,7 @@ export function initReconstruction(options: { replay: ReplayController }) {
       exp.addEventListener('click', () => download(serializeSession(s), fileName(s)));
       const del = button(tools, 'Delete', 'secondary', 'Delete ' + s.title);
       del.addEventListener('click', () => {
-        if (!confirm('Delete the saved reconstruction “' + s.title + '”? This cannot be undone.')) return;
+        if (!confirm('Delete the saved session “' + s.title + '”? This cannot be undone.')) return;
         try {
           saveReconstructions(sessions.filter(x => x.id !== s.id));
         } catch (error) {
@@ -1080,12 +1373,12 @@ export function initReconstruction(options: { replay: ReplayController }) {
     input.value = '';
     if (!file) return;
     if (file.size > MAX_IMPORT_BYTES) {
-      status.textContent = 'That file is too large to be a reconstruction.';
+      status.textContent = 'That file is too large to be a tracking session.';
       return;
     }
     try {
       const parsed = parseSession(await file.text());
-      if (dirty && shots.length && !confirm('Open the imported reconstruction? Unsaved changes to the current one will be lost.')) return;
+      if (dirty && shots.length && !confirm('Open the imported session? Unsaved changes to the current one will be lost.')) return;
       load(parsed);
       dirty = true;
       status.textContent = 'Imported “' + parsed.title + '”. Save it to keep it in this browser.';
@@ -1096,6 +1389,7 @@ export function initReconstruction(options: { replay: ReplayController }) {
 
   window.addEventListener('pagehide', () => {
     queue.clear();
+    closeVideo();
     for (const s of shots) releaseShot(s);
   });
   renderSaved();

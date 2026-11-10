@@ -1,140 +1,180 @@
-# Multi-screenshot hand reconstruction
+# Hand tracking across frames
 
-Reconstruct hand turns several screenshots of one simulated or finished hand into a checkpoint timeline. Each screenshot is one observed moment. The app compares neighbouring screenshots and lists what changed. It never invents the actions in between: an action becomes an event only when you enter it and the hand engine accepts it. This is an offline study tool, not live-game assistance.
+**Track hand** turns several screenshots or video frames of one simulated or finished hand into a tracked timeline. Each frame is one observed moment. The app does three things with them:
+- it works out which seat is which player in every frame;
+- it compares neighbouring frames and says whether they can belong to one hand;
+- it lists what changed.
 
-## Pipeline
+It never invents actions between frames: an action becomes an event only when you enter it and the hand engine accepts it. This is an offline study tool, not live-game monitoring or play advice.
 
-```
-Upload (several files, drag and drop, or a sample sequence) → order (↑ ↓, drag, or restore upload order)
-→ per screenshot: image checks → resize and re-encode → screenshot provider (Claude or fixture), two at a time
-→ schema validation (parseScreenshotResponse) → HandObservation
-→ review and correction (shared editor) → compareObservations for each neighbouring pair
-→ reconstructHand: checkpoints, intervals, timeline, metrics → your resolutions → save, export, match saved hands
-```
+## Modules
 
-| File | Role |
+Each concern is its own pure module with no browser APIs, so each can be tested and replaced on its own.
+
+| Concern | File | Main API |
+| --- | --- | --- |
+| Recognition | `src/vision/` (providers, parsing, review), `queue.ts` (batching) | `ScreenshotProvider`, `RecognitionQueue` |
+| Video input | `src/vision/video.ts` (pure), `src/web/video-frames.ts` (browser) | `videoProblem`, `sampleTimes`, `openVideo`, `captureFrame` |
+| Observations | `observation.ts` | `createObservation`, `withRecognition`, `restoreObservation` |
+| Player identity | `identity.ts` | `trackPlayers`, `seatPairing`, `setOverride`, `remapOverrides` |
+| State comparison | `compare.ts` | `compareFrameStates(previous, current, pairing)`, `compareObservations` |
+| Temporal consistency | `consistency.ts` | `classifyInterval`, `CONSISTENCY_LABELS` |
+| User actions | `resolve.ts` | `checkpointState`, `checkActions` (through the hand engine) |
+| Reconstruction | `reconstruct.ts` | `reconstructFrameSequence` (`reconstructHand`), `matchHistory` |
+| Replay | `replay-steps.ts` | `buildReplaySteps`, `moveStep` |
+| Sessions | `session.ts` | `createSession`, `parseSession`, ordering helpers |
+
+How they connect: frames → recognition → observations → identity → comparison (through a `SeatPairing`) → consistency and reconstruction → replay steps. Comparison only compares values; it learns who is who from identity's pairing.
+
+## Input
+
+- **Screenshots:** up to 20 PNG, JPEG, or WebP files, each at most 12 MB and 200–16,384 px per side. Each gets a stable ID and keeps its upload position. You set the order; file names are never used.
+- **Video:** one MP4, WebM, Ogg, or QuickTime file, up to 500 MB and 30 minutes, decoded by the browser's own `<video>` element.
+  - **Sampling:** **Sample frames** seeks every 0.5–10 seconds and draws small thumbnails. The interval widens automatically to stay under 120 thumbnails, so the app never processes every frame.
+  - **Adding frames:** ticked frames are copied at recognition size and added in video order. They are marked as video frames with their real position (`timestampMs`); no other timestamps are created.
+  - **Privacy:** the video itself is not uploaded or stored.
+- **Reading:** **Read frames** queues unread frames, two requests at a time. A frame that was read is cached and never sent again, a failed one has **Retry**, and a reply that arrives after its frame was removed or the batch was cancelled is dropped. Thumbnails load lazily, and temporary object URLs are released when frames, videos, or the page go away.
+
+## Player identity
+
+`trackPlayers(observations, { overrides, hidden })` goes through the frames in order. For each seat, it uses the first rule that applies:
+
+1. **Your match:** a match you made: a player from an earlier frame, or `new` for someone not seen before.
+2. **Name:** a name already linked to a player. A name seen for the first time waits for step 4, since it may belong to a player matched earlier by position.
+3. **Your seat:** your own seat, from the previous frame where it was known.
+4. **Seat position:** the seat's position relative to players already matched in this frame. This applies only when the table has the same number of seats and every matched player moved by the same amount, and a seat is never placed on a player known by a different name.
+5. **Everything else:**
+   - In the first frame, or when no known player is free, the seat is a new player.
+   - Otherwise the seat stays **unmatched**, with candidates ranked by stack plausibility (a stack only grows when a pot is awarded). The app never merges two players on weak evidence.
+
+**Missing players:** players seen earlier but not placed in a frame are listed as missing. That is not a fold. **Mark as not visible** records that they are still in the hand.
+
+**Conflicts:** two seats matched to the same player are reported as a conflict.
+
+**Stable IDs:** player IDs come from names (`name:riley`) or first appearance, so they stay the same for a given set of frames and matches.
+
+**Seat moves:** reordering seats in the correction form keeps your matches and entered actions on the same players.
+
+## State differences
+
+`compareFrameStates(previous, current, pairing)` reports differences in a fixed order. Each one carries:
+- the field and the tracked player ID;
+- both known values and both observation IDs;
+- the evidence: observed, inferred, or confirmed;
+- the reader's confidence labels;
+- a severity: info, review, or contradiction;
+- a warning, where there is one.
+
+**Board:**
+- a new flop, turn, or river;
+- several streets dealt at once (flagged);
+- cards becoming readable or unreadable;
+- a changed card or a shrinking board (both contradictions).
+
+**Players:**
+- stack and bet changes, and a stack that grows (flagged for review);
+- folds, and all-in when a stack becomes 0;
+- hole cards shown, changed (a contradiction), or hidden;
+- a player unfolding (a contradiction);
+- presence: hidden, visible again, appearing for the first time (flagged for review), or unmatched.
+
+**Table:**
+- pot changes, compared using everything in the middle;
+- the street changing, or going backwards (a contradiction);
+- the dealer button moving to another player (a contradiction that suggests a new hand);
+- the blinds changing.
+
+**Unknown values:** a value missing on either side is never a change. Unknown is never treated as zero: a stack becoming unreadable is "not readable", not all-in.
+
+## Temporal consistency
+
+`classifyInterval` puts each pair of neighbouring frames in one class:
+
+| Class | Meaning |
 | --- | --- |
-| `types.ts` | `HandObservation`, `StateDifference`, `Interval`, `ManualAction`, `IntervalResolution`, `ReconstructionResult`, `ReconstructionSession` |
-| `observation.ts` | Creating, correcting, and restoring observations; chip totals that stay `null` when anything is unknown |
-| `compare.ts` | `alignSeats`, `compareObservations`: the difference engine |
-| `reconstruct.ts` | `reconstructHand`, `matchHistory` |
-| `resolve.ts` | `checkpointState`, `checkActions`: user actions through the hand engine |
-| `session.ts` | Ordering helpers, `createSession`, `serializeSession`, `parseSession` |
-| `queue.ts` | `RecognitionQueue`: bounded concurrency, retries, stale-result protection |
-| `fixtures.ts` | Five synthetic sequences |
+| Consistent | Every visible change is known and explained. |
+| Consistent, with missing information | Nothing contradicts, but values or players were not visible. A hidden card, a hidden player, or unknown chips never contradicts. |
+| Ambiguous | Several histories fit: chips moved without known actions, streets were skipped, or a seat is unmatched. |
+| Contradictory | Something that cannot happen in one hand: a changed card, a shrinking board, an earlier street, unfolding, a moved button, changed blinds, a card in two places, or chips created or destroyed. A shrinking board or an earlier street also suggests the frames are out of order. |
+| Separate hands | You split the sequence here. |
 
-Everything in `src/reconstruction/` is pure TypeScript without browser APIs. The interface is `src/web/reconstruct-view.ts`, with `table-view.ts` (the table shared with hand replay) and `recognition-editor.ts` (the correction form shared with Import screenshot).
+Chip conservation is checked only when the same players are visible in both frames, because a hidden player's chips are unknown. A sequence is never rejected because frames in between are missing.
 
-## Upload and order
+## Reconstruction and evidence
 
-- **Limits:** up to `MAX_SCREENSHOTS` (20) PNG, JPEG, or WebP files of at most 12 MB and 200–16,384 px per side. Files past the limit are skipped with a message.
-- **IDs and order:** each screenshot gets a stable ID when added and keeps its upload position (`uploadIndex`). The chronological order is whatever you set; file names and file times are never used.
-- **Reordering:** reordering re-numbers the observations. A resolution survives only while its two screenshots stay next to each other.
+`reconstructFrameSequence(observations, { resolutions, identity })` returns:
+- checkpoints, one per frame;
+- intervals, one per pair of neighbouring frames, each with its differences, status, consistency, and reasons;
+- player identities, and hands split where you marked them;
+- contradictions that span the whole sequence;
+- warnings and metrics.
 
-## Recognition
+It uses three evidence levels:
+- **Observed:** read from a frame, such as "Turn dealt: Kh" or "Riley’s stack fell from 990 to 970". Two facts also follow directly from what was read: unchanged stacks while the board advanced mean only checks happened, and a run-out with at most one player holding chips means no betting.
+- **Inferred:** possible explanations, such as who may have put chips in, a skipped street's betting, or a possible pot award. These are listed as alternatives and never turned into events.
+- **Confirmed:** observed changes you verified with **Confirm**, values you corrected, and actions you entered.
 
-- **Batch reading:** **Read screenshots** queues every unread screenshot. `RecognitionQueue` runs two requests at a time and reports totals, finished, in progress, failed, and stopped screenshots.
-- **No repeated requests:** a recognized screenshot is never sent again in the same session. A failed one can be retried on its own.
-- **Late results:** a result arriving after the screenshot was removed or the batch was cancelled is dropped, so it cannot overwrite your corrections.
-- **Providers and keys:** each screenshot uses the same providers as Import screenshot. The API key stays on the server.
+**Entered actions** go through `checkActions`:
+1. The earlier frame becomes a betting state, which needs every live seat's stack and bet. What a frame cannot show is set to the most permissive legal value: nobody has acted on the street, and the last raise was one big blind.
+2. Each action is applied by the hand engine's `applyHandEvent`, which enforces amounts to call, stacks, minimum bets and raises, and folded or all-in players. Turn order is not checked.
+3. If your actions close the betting round, the next street's cards are dealt from the later frame.
+4. The result is compared with the later frame player by player.
 
-## Observations
+Valid actions become `HandEvent`s whose timestamps record when you entered them.
 
-A `HandObservation` wraps the screenshot's `ScreenshotRecognition`:
+## Replay
 
-- **Field values:** every field keeps its value (`null` for unknown), the reader's confidence label, and its source (observed, inferred, or corrected).
-- **Review status:** it is `pending`, `reviewed`, or `corrected`. It becomes `corrected` as soon as any field is edited.
-- **Timestamps:** `timestamp` stays `null` unless supplied; nothing is taken from files.
-- **Missing values:** a missing value is never read as a fold or a departure.
+`buildReplaySteps(result)` produces one list with four kinds of step:
+- **Observed frame:** the recognized table.
+- **Verified event:** the hand engine's state after an action you entered and it accepted.
+- **Unresolved interval:** a gap whose actions are unknown or contradictory.
+- **New hand:** where you split the sequence.
 
-## The difference engine
+First, previous, next, last, and the slider move between steps (`moveStep`, which uses the hand replay's `moveCursor`). Incomplete sequences replay as checkpoints, and nothing is invented or animated between them. **Check against saved hands** finds a recorded hand that fits every frame in order, and opens it in Hand replay.
 
-`compareObservations(previous, next)` lines seats up by name, allowing a rotated view, and reports differences in a fixed order. Each difference has:
-- the field;
-- the earlier and later values;
-- both observation IDs;
-- an evidence class (observed, inferred, or includes a correction);
-- both confidence labels;
-- a severity: `info`, `review` (possible but unusual), or `contradiction` (impossible within one hand);
-- an optional warning.
+## Manual resolution
 
-What it reports:
-- **Board:** new flop, turn, or river cards; more than one street at once (flagged); cards becoming readable or unreadable; a changed card or a shrinking board (contradictions).
-- **Chips:** pot plus bets, and each stack and bet. A growing stack is marked for review.
-- **Players:** folds, a folded player back in the hand (contradiction), hole cards shown, changed (contradiction), or hidden, seat count changes, and seat names that do not line up.
-- **Table:** street changes and a street going backwards; a moved dealer button and changed blinds, both contradictions that suggest different hands.
+- **Players:** match a seat to a tracked player or to someone new, go back to the automatic match, or mark a missing player as not visible.
+- **Values:** correct any field with the shared correction form, including seat order. Only that frame changes, and everything is recomputed from stored observations, with no new recognition.
+- **Changes:** **Confirm** marks an observed change as verified.
+- **Gaps:** enter known actions, **Leave unresolved**, or **Split: these are separate hands**. **Revalidate** reruns all checks.
 
-A value missing on either side is not a change. It is reported only as becoming visible or hidden.
+Corrections to identity or values recompute every comparison without touching unrelated corrections.
 
-## Reconstruction
+## Sessions
 
-`reconstructHand(observations, { resolutions })` returns checkpoints, intervals, a timeline that alternates them, contradictions across the whole sequence, warnings, and metrics. Each interval separates three kinds of finding:
+**Save session** stores a version 2 `ReconstructionSession` in `localStorage` (`poker-study:reconstructions`):
+- ID, title, and times;
+- source type: screenshots, video, or mixed;
+- frame order and sources, with video positions;
+- observations, including corrections;
+- player matches and hidden-player marks;
+- confirmed changes and actions;
+- warnings and per-interval validation results.
 
-- **Confirmed:** facts the screenshots show, such as "Turn dealt: Kh", "Riley’s stack fell from 990 to 970", or "Sam is shown as folded". Two rules also confirm facts. Unchanged stacks while the board advanced mean only checks happened. A run-out with at most one player holding chips means no more betting.
-- **Possible:** for example, "An additional 60 chips appear in the middle between these screenshots. The contributing actions are unknown." Other examples are who could have contributed, skipped streets, and possible pot awards. These are alternatives, never facts, and no events are produced from them.
-- **Contradictions:**
-  - impossible differences between the two screenshots;
-  - chip totals that differ, since no action creates or removes chips and rake is not modeled;
-  - a card in two places, or one player shown with more than two different cards;
-  - duplicate cards or impossible boards within one screenshot.
+Images are saved only when you tick the box. Without them, reopening restores everything but the pictures. Videos are never saved. JSON export and import use the same format. `parseSession` validates every part, upgrades version 1 files, and recomputes the derived results.
 
-| Interval status | Meaning |
-| --- | --- |
-| No change / Verified | Nothing changed, or every change is accounted for |
-| Unresolved | Chips moved, or may have moved, without known actions |
-| Left unresolved | You accepted that the actions stay unknown |
-| Resolved / Partly resolved | Your confirmed actions explain all, or only part, of the change, or one is invalid |
-| Contradiction | Needs a correction, or a decision that these are different hands |
-| Different hands | You marked the pair as two hands; their contradictions are not counted |
+## Demo sequence
 
-## Resolving an interval
+**Load demo sequence** (`DEMO_SEQUENCE` in `fixtures.ts`) has five frames of a fictional three-player hand, preflop to showdown. Every frame shows the dealer, chip stacks, the pot, and the hole cards that are known. It shows:
+- an unreadable name, so Riley is matched by seat position;
+- a client that hides folded players, so Sam is not visible in frame 4 (not a fold);
+- a misread turn card (Kh read as Kd) to correct;
+- the flop actions between frames 2 and 3, supplied as confirmed, which replay as verified events;
+- unresolved gaps elsewhere.
 
-You can do any of these, in any combination:
-- leave it unresolved;
-- enter known actions;
-- correct values in either screenshot;
-- mark the pair as different hands;
-- revalidate.
-
-Saving never requires an interval to be resolved.
-
-Entered actions are checked by `checkActions`:
-
-1. **Starting state:** `checkpointState` turns the earlier screenshot into a betting state. Every live seat's stack and bet must be known. What a screenshot cannot show is set to the most permissive legal value: nobody has acted on the street yet, and the last raise is one big blind.
-2. **Each action:** it goes through the hand engine's `applyHandEvent`. The engine checks amounts to call, stacks, minimum bets and raises, and folded or all-in players. Turn order is not checked, because screenshots do not show it.
-3. **Next street:** if your actions close the betting round and the later screenshot shows the next board cards, that observed deal is applied.
-4. **Comparison:** the result is compared with the later screenshot. Unexplained chips, unentered folds, and conflicts are listed.
-
-Valid actions become executable `HandEvent`s whose timestamps record when you entered them. **Step through these actions** replays them on the table. Nothing else is animated.
-
-## Timeline, saving, and history
-
-- **Timeline:** it shows each checkpoint (street, board, pot, stacks, review state) and each interval (status, summary, counts). First, previous, next, last, and the slider move between checkpoints with `moveCursor`. Clicking an interval selects its later screenshot.
-- **Saving:** **Save reconstruction** stores a `ReconstructionSession` in `localStorage` (`poker-study:reconstructions`): ID, schema version 1, title, times, screenshot order, observations with corrections, resolutions with confirmed actions, and warnings. Images are saved only when you tick **Also save the screenshot images**. Otherwise reopening restores the timeline and corrections, but not the screenshots.
-- **Managing saved sessions:** saved reconstructions can be opened, renamed, exported as JSON, imported, and deleted. `parseSession` validates everything and recomputes warnings.
-- **Saved hands:** **Check against saved hands** uses `matchHistory`. It looks for one replay position per screenshot, in order and with one seat rotation, using the hand history engine's `matchObservation`. It can then open the matching hand in hand review at the selected screenshot.
-
-## Quality summary
-
-The summary counts screenshots, recognized checkpoints, corrected fields, verified transitions (verified or resolved intervals), unresolved intervals, and contradictions. It does not show an accuracy percentage, because that needs labeled ground truth. Confidence labels are the reader's own uncalibrated estimates.
-
-## Fixtures
-
-`fixtures.ts` holds five synthetic sequences drawn by this project and read by the fixture provider:
-1. **Complete hand:** five frames from preflop to showdown, three players.
-2. **Missing street:** preflop, then the turn.
-3. **Ambiguous betting:** the pot grows from 60 to 120 while two stacks are unreadable.
-4. **Recognition error:** a 7♣ misread as a 7♠.
-5. **Multiway all-in:** three players, one side pot. The test checks it against the engine's own settlement.
+It needs no API key.
 
 ## Toward physical tables
 
-The pipeline needs only a `ScreenshotProvider` that returns a `ScreenshotRecognition`. A camera or on-device provider can feed the same queue, comparison, reconstruction, and review screens without changing the hand history engine.
+Any provider that returns a `ScreenshotRecognition`, such as a camera or an on-device model, feeds the same queue, identity, comparison, consistency, and reconstruction modules without changes to the hand history engine.
 
 ## Limitations
 
-- **Seat matching:** seats are matched by order and visible names. With no readable names, a rotated client view cannot be detected.
+- **Turn indicators:** the reader does not report which player is to act, so changes in the active player are not tracked.
+- **Turn order and raise size:** turn order is not checked for entered actions, and the minimum raise assumes the last raise was one big blind.
 - **Pot detail:** side pots shown separately on screen are read as one pot, and rake is not modeled.
-- **Unknown stacks:** actions cannot be checked when a live seat's stack or bet is unknown in the earlier screenshot.
-- **Turn order and raise size:** turn order is not validated, and the minimum raise assumes the last raise was one big blind.
-- **Accuracy:** recognition accuracy depends on the reader and has not been measured on real screenshots.
+- **Unnamed seats:** identity relies on names, your seat, and relative position. Players with no readable name at a table whose size changed stay unmatched until you match them.
+- **Video:** decoding depends on the browser's codecs, and frame times come from seeking, so they are as precise as the browser's seek. Video extraction was not exercised in an automated browser test; the sampling and validation logic is unit-tested.
+- **Accuracy:** recognition accuracy has not been measured on real screenshots or video.
+- **Saved hands:** a fully resolved session cannot yet be saved as a hand history.

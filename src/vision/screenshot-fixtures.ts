@@ -25,6 +25,8 @@ export interface FixtureTable {
   readonly covered?: { readonly board?: number; readonly heroCard?: number };
   /** Blur names and stacks as if the text were unreadable. */
   readonly blurText?: boolean;
+  /** Blur only these seats' names. */
+  readonly blurNames?: readonly number[];
 }
 
 export interface ScreenshotFixture {
@@ -86,7 +88,8 @@ export function drawTable(table: FixtureTable): string {
     const group: string[] = [`<g${seat.folded ? ' opacity="0.42"' : ''}>`];
     group.push(`<rect x="${x - 70}" y="${y - 6}" width="140" height="52" rx="10" fill="#0f1215" stroke="${seat.hero ? '#f2c94c' : '#4b5563'}" stroke-width="2"/>`);
     const blur = table.blurText ? ' filter="url(#blur)"' : '';
-    group.push(`<text x="${x}" y="${y + 16}" font-size="16" text-anchor="middle" fill="#e5e7eb" font-family="Arial"${blur}>${esc(seat.name)}</text>`);
+    const nameBlur = table.blurText || table.blurNames?.includes(k) ? ' filter="url(#blur)"' : '';
+    group.push(`<text x="${x}" y="${y + 16}" font-size="16" text-anchor="middle" fill="#e5e7eb" font-family="Arial"${nameBlur}>${esc(seat.name)}</text>`);
     const stack = seat.stack === null ? '?,???' : seat.stack.toLocaleString('en-US');
     group.push(`<text x="${x}" y="${y + 38}" font-size="16" font-weight="700" text-anchor="middle" fill="#bce78e" font-family="Arial"${blur}>${stack}</text>`);
     if (seat.folded) group.push(`<text x="${x}" y="${y - 14}" font-size="15" text-anchor="middle" fill="#f87171" font-family="Arial">Fold</text>`);

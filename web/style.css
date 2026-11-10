@@ -401,3 +401,30 @@ footer { padding-block: 1.25rem 2rem; color: #425d55; font-size: .88rem; }
   .recon-list { grid-auto-flow: column; grid-auto-columns: minmax(12rem, 1fr); overflow-x: auto; padding-bottom: .3rem; }
   .recon-tl-button.interval { margin-left: .6rem; width: calc(100% - .6rem); }
 }
+
+/* Track hand ------------------------------------------------------------- */
+.video-panel { margin: .8rem 0; padding: .8rem; border: 1px solid #d7e0d6; border-radius: .9rem; background: #fbfcf9; }
+.video-panel h3 { margin: 0; }
+.video-frames { display: grid; grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); gap: .5rem; max-height: 28rem; overflow-y: auto; }
+.video-thumb { display: grid; gap: .2rem; padding: .3rem; border: 2px solid transparent; border-radius: .6rem; background: #fff; cursor: pointer; font-weight: 500; position: relative; }
+.video-thumb.selected { border-color: #1b634b; background: #eaf5e1; }
+.video-thumb input { position: absolute; top: .45rem; left: .45rem; width: 1.2rem; height: 1.2rem; min-height: 0; }
+.video-thumb img { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; border-radius: .35rem; }
+.step-kind { display: inline-block; padding: .05rem .45rem; border-radius: .3rem; font-size: .7rem; font-weight: 750; background: #e8ebe7; color: #3f4d47; }
+.step-kind:empty { display: none; }
+.step-kind.kind-checkpoint { background: #e3f1dc; color: #1b634b; }
+.step-kind.kind-event { background: #dfe6f5; color: #1f3566; }
+.step-kind.kind-unresolved { background: #fff1c2; color: #5a4a10; border: 1px dashed #a1830f; }
+.step-kind.kind-split { background: #f4e3f5; color: #5b2160; }
+.recon-status.consistency-consistent { background: #e3f1dc; color: #1b634b; }
+.recon-status.consistency-consistent-missing { background: #eef0f6; color: #34405a; }
+.recon-status.consistency-ambiguous { background: #fff1c2; color: #5a4a10; }
+.recon-status.consistency-contradictory { background: #fbd5cf; color: #8a1c12; }
+.recon-status.consistency-split { background: #f4e3f5; color: #5b2160; }
+.recon-interval-head { flex-wrap: wrap; }
+.recon-players { margin: 0 0 .8rem; }
+.recon-player-list { list-style: none; padding: 0; margin: .2rem 0; display: grid; gap: .35rem; font-size: .86rem; }
+.recon-player-list li { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; }
+.recon-player-list select { width: auto; min-height: 2.2rem; margin: 0; padding: .2rem .4rem; font-size: .82rem; }
+.evidence-confirmed { color: #1f3566; font-weight: 700; }
+.evidence-inferred { font-style: italic; }

@@ -27,7 +27,7 @@
     <button type="button" class="view-tab" data-view="study" aria-current="page">Study table</button>
     <button type="button" class="view-tab" data-view="replay">Hand replay</button>
     <button type="button" class="view-tab" data-view="screenshot">Import screenshot</button>
-    <button type="button" class="view-tab" data-view="reconstruct">Reconstruct hand</button>
+    <button type="button" class="view-tab" data-view="reconstruct">Track hand</button>
   </nav>
   <main class="wrap workspace" id="study-view">
     <section class="panel table-panel" aria-labelledby="table-title">
@@ -252,13 +252,15 @@
   <main class="wrap recon-workspace" id="reconstruct-view" hidden>
     <section class="panel" aria-labelledby="recon-title">
       <div class="heading">
-        <h2 id="recon-title">Reconstruct hand</h2>
+        <h2 id="recon-title">Track hand</h2>
+        <button type="button" id="recon-demo" class="secondary">Load demo sequence</button>
       </div>
-      <p>Add screenshots from different moments of one simulated or finished hand. Each one is read separately, then neighbouring screenshots are compared. What the screenshots show is listed as confirmed; actions they do not show stay unknown unless you enter them. This is for offline study only.</p>
+      <p>Add screenshots, or frames from a recorded video, of one simulated or finished hand. Each frame is read separately, players are matched across frames, and neighbouring frames are compared. What the frames show is listed as observed; actions they do not show stay unknown unless you enter them. This is for offline study of recorded hands, not live play.</p>
       <div class="dropzone" id="recon-drop" tabindex="0" role="group" aria-label="Screenshot drop area" aria-describedby="recon-drop-help">
-        <p id="recon-drop-help">Drop up to 20 PNG, JPEG, or WebP screenshots here (12 MB each), or</p>
+        <p id="recon-drop-help">Drop up to 20 PNG, JPEG, or WebP screenshots (12 MB each) or one video (MP4, WebM, up to 500 MB) here, or</p>
         <div class="actions">
-          <label class="button secondary file-button">Choose files<input type="file" id="recon-file" accept="image/png,image/jpeg,image/webp" multiple></label>
+          <label class="button secondary file-button">Choose screenshots<input type="file" id="recon-file" accept="image/png,image/jpeg,image/webp" multiple></label>
+          <label class="button secondary file-button">Choose a video<input type="file" id="recon-video" accept="video/mp4,video/webm,video/ogg,video/quicktime"></label>
           <label class="sample-picker">or try a sample sequence
             <select id="recon-sample">
               <option value="">Choose a sample…</option>
@@ -266,9 +268,24 @@
           </label>
         </div>
       </div>
-      <p class="consent" id="recon-consent">Reading sends a resized copy of each screenshot to Anthropic’s Claude API through this app’s server, at most two at a time. Nothing is sent until you press <strong>Read screenshots</strong>, and images are stored only if you save them with the reconstruction.</p>
+      <section class="video-panel" id="recon-video-panel" aria-label="Frames from a video" hidden>
+        <div class="heading">
+          <h3>Pick frames from the video</h3>
+          <button type="button" id="recon-video-close" class="secondary">Close video</button>
+        </div>
+        <p id="recon-video-caption" class="fine-print"></p>
+        <div class="actions">
+          <label class="review-field">Sample<select id="recon-video-interval"></select></label>
+          <button type="button" id="recon-video-sample" class="secondary">Sample frames</button>
+          <button type="button" id="recon-video-cancel" class="secondary" hidden>Stop sampling</button>
+          <button type="button" id="recon-video-add" disabled>Add selected frames</button>
+        </div>
+        <p id="recon-video-status" role="status" aria-live="polite"></p>
+        <div id="recon-video-frames" class="video-frames"></div>
+      </section>
+      <p class="consent" id="recon-consent">Reading sends a resized copy of each frame to Anthropic’s Claude API through this app’s server, at most two at a time. Nothing is sent until you press <strong>Read frames</strong>. The video itself never leaves this device, and images are stored only if you save them with the session.</p>
       <div class="actions">
-        <button type="button" id="recon-read" disabled>Read screenshots</button>
+        <button type="button" id="recon-read" disabled>Read frames</button>
         <button type="button" id="recon-cancel" class="secondary" hidden>Cancel</button>
         <button type="button" id="recon-upload-order" class="secondary" hidden>Restore upload order</button>
         <button type="button" id="recon-clear" class="secondary" hidden>Start over</button>
@@ -277,25 +294,26 @@
       <dl id="recon-progress" class="recon-metrics" hidden></dl>
 
       <details class="saved-shots" id="recon-saved-box">
-        <summary>Saved reconstructions</summary>
+        <summary>Saved tracking sessions</summary>
         <ul id="recon-saved" class="hand-list"></ul>
         <label class="button secondary file-button">Import JSON<input type="file" id="recon-import" accept="application/json,.json"></label>
       </details>
     </section>
 
-    <section class="panel recon-main" id="recon-main" aria-label="Reconstruction workspace" hidden>
+    <section class="panel recon-main" id="recon-main" aria-label="Tracking workspace" hidden>
       <div class="recon-grid">
         <div class="recon-col recon-shots">
-          <h3>Screenshots</h3>
-          <p class="fine-print">Put them in the order they happened. File names and times are not used.</p>
+          <h3>Frames</h3>
+          <p class="fine-print">Put them in the order they happened. File names are not used; video frames show their time.</p>
           <ol id="recon-list" class="recon-list"></ol>
         </div>
         <div class="recon-col recon-table">
           <div class="recon-table-head">
             <h3 id="recon-table-title">Table</h3>
+            <span id="recon-step-kind" class="step-kind"></span>
             <p id="recon-table-note" class="fine-print"></p>
           </div>
-          <div class="felt replay-felt" id="recon-felt" role="group" aria-label="Reconstructed table">
+          <div class="felt replay-felt" id="recon-felt" role="group" aria-label="Tracked table">
             <div class="replay-seats" id="recon-seats-top"></div>
             <div class="center">
               <p class="replay-phase" id="recon-phase"></p>
@@ -304,18 +322,17 @@
             </div>
             <div class="replay-seats" id="recon-seats-bottom"></div>
           </div>
-          <div id="recon-steps" class="recon-steps" hidden></div>
           <div class="actions">
-            <button type="button" id="recon-edit" class="secondary" aria-expanded="false">Review and correct this screenshot</button>
+            <button type="button" id="recon-edit" class="secondary" aria-expanded="false">Review and correct this frame</button>
             <button type="button" id="recon-mark-reviewed" class="secondary">Mark as reviewed</button>
           </div>
           <div id="recon-editor-box" class="recon-editor" hidden>
-            <img id="recon-editor-image" class="recon-editor-image" alt="The selected screenshot">
+            <img id="recon-editor-image" class="recon-editor-image" alt="The selected frame">
             <div id="recon-editor"></div>
           </div>
         </div>
         <div class="recon-col recon-changes">
-          <h3>Detected changes</h3>
+          <h3>Players and changes</h3>
           <div id="recon-changes"></div>
         </div>
       </div>
@@ -323,16 +340,17 @@
 
     <section class="panel" id="recon-timeline-panel" aria-labelledby="recon-timeline-title" hidden>
       <div class="heading">
-        <h2 id="recon-timeline-title">Timeline</h2>
+        <h2 id="recon-timeline-title">Replay</h2>
+        <p class="fine-print">Observed frames, verified events (actions you confirmed and the hand rules accepted), and unresolved intervals. Nothing is invented between frames.</p>
       </div>
       <div class="replay-controls" role="group" aria-label="Checkpoint controls">
         <div class="actions">
-          <button type="button" id="recon-first" class="secondary" aria-label="First checkpoint">⏮</button>
-          <button type="button" id="recon-prev" class="secondary" aria-label="Previous checkpoint">◀</button>
-          <button type="button" id="recon-next" class="secondary" aria-label="Next checkpoint">▶</button>
-          <button type="button" id="recon-last" class="secondary" aria-label="Last checkpoint">⏭</button>
+          <button type="button" id="recon-first" class="secondary" aria-label="First step">⏮</button>
+          <button type="button" id="recon-prev" class="secondary" aria-label="Previous step">◀</button>
+          <button type="button" id="recon-next" class="secondary" aria-label="Next step">▶</button>
+          <button type="button" id="recon-last" class="secondary" aria-label="Last step">⏭</button>
         </div>
-        <label class="scrub">Checkpoint <span id="recon-position"></span>
+        <label class="scrub">Step <span id="recon-position"></span>
           <input type="range" id="recon-scrub" min="0" max="0" step="1" value="0">
         </label>
       </div>
@@ -347,9 +365,9 @@
       <p class="fine-print">Counts, not accuracy: measuring accuracy needs screenshots with known answers. Confidence labels are the reader’s own estimates.</p>
       <ul id="recon-warnings" class="shot-warnings"></ul>
       <div class="actions">
-        <label class="review-field">Title<input id="recon-name" maxlength="80" placeholder="Reconstruction"></label>
+        <label class="review-field">Title<input id="recon-name" maxlength="80" placeholder="Tracked hand"></label>
         <label class="checkbox"><input type="checkbox" id="recon-keep-images"> Also save the screenshot images</label>
-        <button type="button" id="recon-save">Save reconstruction</button>
+        <button type="button" id="recon-save">Save session</button>
         <button type="button" id="recon-export" class="secondary">Export JSON</button>
       </div>
       <p id="recon-save-note" class="fine-print" role="status"></p>

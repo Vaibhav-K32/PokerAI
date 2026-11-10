@@ -3,7 +3,7 @@
 import {
   restoreRecognition, type ConfidenceLabel, type RecognizedField, type ScreenshotRecognition,
 } from '../vision/screenshot.js';
-import type { HandObservation, ReviewStatus } from './types.js';
+import type { FrameSource, HandObservation, ReviewStatus } from './types.js';
 
 export class ReconstructionError extends Error {
   constructor(message: string) {
@@ -41,15 +41,22 @@ export function reviewStatusOf(rec: ScreenshotRecognition, marked: ReviewStatus)
   return correctedFieldCount(rec) > 0 ? 'corrected' : marked === 'corrected' ? 'reviewed' : marked;
 }
 
-export function createObservation(screenshotId: string, sequenceIndex: number, recognition: ScreenshotRecognition): HandObservation {
+/** Video position limit for saved frames: 24 hours. */
+export const MAX_TIMESTAMP_MS = 24 * 60 * 60 * 1000;
+
+export function createObservation(
+  screenshotId: string, sequenceIndex: number, recognition: ScreenshotRecognition,
+  frame: { source?: FrameSource; timestampMs?: number | null } = {},
+): HandObservation {
   return {
     id: 'obs-' + screenshotId,
     screenshotId,
     sequenceIndex,
     timestamp: null,
+    timestampMs: frame.source === 'video' && frame.timestampMs !== undefined ? frame.timestampMs : null,
     recognition,
     reviewStatus: reviewStatusOf(recognition, 'pending'),
-    source: 'screenshot',
+    source: frame.source ?? 'screenshot',
   };
 }
 
@@ -104,7 +111,11 @@ export function restoreObservation(raw: unknown): HandObservation {
     throw new ReconstructionError('An observation time must be an ISO time or null.');
   }
   if (!STATUSES.includes(raw.reviewStatus as ReviewStatus)) throw new ReconstructionError('An observation has an unknown review status.');
-  if (raw.source !== 'screenshot') throw new ReconstructionError('An observation must come from a screenshot.');
+  if (raw.source !== 'screenshot' && raw.source !== 'video') throw new ReconstructionError('An observation must come from a screenshot or a video frame.');
+  const timestampMs = raw.timestampMs ?? null;
+  if (timestampMs !== null && (!Number.isSafeInteger(timestampMs) || (timestampMs as number) < 0 || (timestampMs as number) > MAX_TIMESTAMP_MS || raw.source !== 'video')) {
+    throw new ReconstructionError('A frame time must be a whole number of milliseconds, and only video frames have one.');
+  }
   let recognition: ScreenshotRecognition;
   try {
     recognition = restoreRecognition(raw.recognition);
@@ -113,7 +124,7 @@ export function restoreObservation(raw: unknown): HandObservation {
   }
   return {
     id: raw.id, screenshotId: raw.screenshotId, sequenceIndex: raw.sequenceIndex as number,
-    timestamp: raw.timestamp as string | null, recognition,
-    reviewStatus: reviewStatusOf(recognition, raw.reviewStatus as ReviewStatus), source: 'screenshot',
+    timestamp: raw.timestamp as string | null, timestampMs: timestampMs as number | null, recognition,
+    reviewStatus: reviewStatusOf(recognition, raw.reviewStatus as ReviewStatus), source: raw.source,
   };
 }

@@ -163,3 +163,81 @@ export const SEQUENCE_FIXTURES: readonly SequenceFixture[] = [
 ];
 
 export const sequenceById = (id: string) => SEQUENCE_FIXTURES.find(s => s.id === id);
+
+// ---------------------------------------------------------------------------
+// Demo sequence for Track hand
+// ---------------------------------------------------------------------------
+
+/**
+ * Five frames of one fictional three-player hand, preflop to showdown, built
+ * to show the whole workflow without an API key:
+ * - frame 3 cannot read Riley's name, so Riley is matched by seat position;
+ * - frame 4 comes from a client that hides folded players (Sam), and misreads
+ *   the turn card Kh as Kd, a contradiction to correct;
+ * - the flop actions between frames 2 and 3 are supplied as confirmed by the
+ *   user (`DEMO_CONFIRMED_ACTIONS`); the other gaps stay unresolved.
+ */
+export const DEMO_SEQUENCE: SequenceFixture = {
+  id: 'demo-track',
+  label: 'Demo: tracked three-player hand',
+  description: 'Five frames from preflop to showdown with an unreadable name, a hidden folded player, a misread card to correct, one interval with confirmed actions, and unresolved gaps.',
+  frames: [
+    fixture('demo-1', 'Preflop, blinds posted', {
+      seats: [
+        { name: 'You', stack: 995, bet: 5, cards: ['Qh', 'Qc'], hero: true },
+        { name: 'Riley', stack: 990, bet: 10, cards: hidden },
+        { name: 'Sam', stack: 1000, bet: 0, cards: hidden, dealer: true },
+      ],
+      board: [], pot: 0, blinds: [5, 10], streetLabel: 'Preflop',
+    }),
+    fixture('demo-2', 'Flop', {
+      seats: [
+        { name: 'You', stack: 990, bet: 0, cards: ['Qh', 'Qc'], hero: true },
+        { name: 'Riley', stack: 990, bet: 0, cards: hidden },
+        { name: 'Sam', stack: 990, bet: 0, cards: hidden, dealer: true },
+      ],
+      board: ['7s', '8d', '2c'], pot: 30, blinds: [5, 10], streetLabel: 'Flop',
+    }),
+    fixture('demo-3', 'Turn, a name is unreadable', {
+      seats: [
+        { name: 'You', stack: 970, bet: 0, cards: ['Qh', 'Qc'], hero: true },
+        { name: 'Riley', stack: 970, bet: 0, cards: hidden },
+        { name: 'Sam', stack: 990, bet: 0, cards: [], folded: true, dealer: true },
+      ],
+      board: ['7s', '8d', '2c', 'Kh'], pot: 70, blinds: [5, 10], streetLabel: 'Turn',
+      blurNames: [1],
+    }, r => {
+      r.players[1].name = { value: null, confidence: 'none' };
+      r.issues.push('One player label is covered by an animation.');
+    }),
+    fixture('demo-4', 'River, folded player hidden, Kh misread', {
+      seats: [
+        { name: 'You', stack: 970, bet: 0, cards: ['Qh', 'Qc'], hero: true },
+        { name: 'Riley', stack: 970, bet: 0, cards: hidden },
+      ],
+      board: ['7s', '8d', '2c', 'Kh', '3d'], pot: 70, blinds: [5, 10], streetLabel: 'River',
+    }, r => {
+      r.board[3] = { card: 'Kd', confidence: 'low' };
+      r.issues.push('Folded players are hidden by this client.');
+    }),
+    fixture('demo-5', 'Showdown', {
+      seats: [
+        { name: 'You', stack: 1090, bet: 0, cards: ['Qh', 'Qc'], hero: true },
+        { name: 'Riley', stack: 920, bet: 0, cards: ['As', '9s'] },
+        { name: 'Sam', stack: 990, bet: 0, cards: [], folded: true, dealer: true },
+      ],
+      board: ['7s', '8d', '2c', 'Kh', '3d'], pot: 0, blinds: [5, 10], streetLabel: 'River',
+    }),
+  ],
+};
+
+/** Flop actions between demo frames 2 and 3 (index 1), by seat in frame 2: You, Riley, Sam. */
+export const DEMO_CONFIRMED_ACTIONS = {
+  intervalIndex: 1,
+  actions: [
+    { seat: 0, type: 'check' as const },
+    { seat: 1, type: 'bet' as const, to: 20 },
+    { seat: 2, type: 'fold' as const },
+    { seat: 0, type: 'call' as const },
+  ],
+};

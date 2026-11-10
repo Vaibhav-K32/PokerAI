@@ -5,9 +5,9 @@
 import { applyHandEvent } from '../history/engine.js';
 import { HAND_SCHEMA_VERSION, HandRuleError, type GameState, type HandEvent, type PlayerState } from '../history/types.js';
 import type { ScreenshotRecognition } from '../vision/screenshot.js';
-import { alignSeats } from './compare.js';
+import { pairByOrder } from './identity.js';
 import { middleChips, possessive, seatName, subjectVerb } from './observation.js';
-import type { ActionCheck, HandObservation, ManualAction, ManualActionType } from './types.js';
+import type { ActionCheck, HandObservation, ManualAction, ManualActionType, SeatPairing } from './types.js';
 
 export const ACTION_LABELS: Record<ManualActionType, string> = {
   fold: 'Fold', check: 'Check', call: 'Call', bet: 'Bet to', raise: 'Raise to', 'all-in': 'All-in',
@@ -94,8 +94,13 @@ function dealFrom(state: GameState, next: ScreenshotRecognition, id: string, tim
  * turn it was; amounts, stacks, and raise sizes are checked by the reducer.
  * When an action closes the betting round and the later screenshot shows the
  * next street's cards, that observed deal is applied before the next action.
+ * The result is compared with the later frame player by player through
+ * `pairing` (tracked identities), or by seat order when none is given.
  */
-export function checkActions(previous: HandObservation, next: HandObservation, actions: readonly ManualAction[]): ActionCheck {
+export function checkActions(
+  previous: HandObservation, next: HandObservation, actions: readonly ManualAction[],
+  pairing: SeatPairing | null = pairByOrder(previous.recognition, next.recognition),
+): ActionCheck {
   const start = checkpointState(previous);
   const fail = (actionId: string, message: string, states: GameState[] = [], events: HandEvent[] = []): ActionCheck =>
     ({ events, states, error: { actionId, message }, unexplained: [], explains: false });
@@ -141,7 +146,7 @@ export function checkActions(previous: HandObservation, next: HandObservation, a
     events.push(made);
     states.push(state);
   }
-  const { unexplained, conflicts } = remaining(previous.recognition, next.recognition, start, state);
+  const { unexplained, conflicts } = remaining(previous.recognition, next.recognition, start, state, pairing);
   if (conflicts.length && actions.length) {
     return { events, states, error: { actionId: actions[actions.length - 1].id, message: conflicts.join(' ') }, unexplained, explains: false };
   }
@@ -149,20 +154,23 @@ export function checkActions(previous: HandObservation, next: HandObservation, a
 }
 
 /** What the confirmed actions leave unexplained, and anything they contradict. */
-function remaining(prev: ScreenshotRecognition, next: ScreenshotRecognition, start: GameState, end: GameState) {
+function remaining(prev: ScreenshotRecognition, next: ScreenshotRecognition, start: GameState, end: GameState, pairing: SeatPairing | null) {
   const unexplained: string[] = [];
   const conflicts: string[] = [];
-  const rotation = alignSeats(prev, next);
-  if (rotation === null) return { unexplained: ['The seats do not line up, so the actions cannot be compared.'], conflicts };
-  const n = prev.players.length;
+  if (!pairing) return { unexplained: ['The seats do not line up, so the actions cannot be compared.'], conflicts };
+  const later = new Map(pairing.pairs.map(x => [x.prev, x.next]));
   let put = 0;
-  for (let k = 0; k < n; k++) {
-    const i = (k + rotation) % n;
+  for (let i = 0; i < prev.players.length; i++) {
     const before = start.players[i];
     const after = end.players[i];
     put += before.stack - after.stack;
-    const seen = next.players[k];
     if (before.status === 'folded') continue;
+    const k = later.get(i);
+    if (k === undefined) {
+      unexplained.push(after.name + (after.name.toLowerCase() === 'you' ? ' are' : ' is') + ' not visible in the later frame, so their chips cannot be checked.');
+      continue;
+    }
+    const seen = next.players[k];
     if (seen.stack.value !== null) {
       if (after.stack > seen.stack.value) unexplained.push(subjectVerb(after.name, 'put').replace(/puts$/, 'put') + ' in ' + (after.stack - seen.stack.value) + ' more chips than the confirmed actions show.');
       if (after.stack < seen.stack.value) unexplained.push((after.name.toLowerCase() === 'you' ? 'You have ' : after.name + ' has ') + (seen.stack.value - after.stack) + ' more chips than the confirmed actions leave (a pot award or returned bet?).');

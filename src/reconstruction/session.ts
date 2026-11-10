@@ -1,10 +1,10 @@
 // Reconstruction sessions: screenshot ordering, resolutions, and the JSON
 // format with runtime validation. Pure; browser storage lives in src/web/.
-import { ReconstructionError, restoreObservation } from './observation.js';
+import { MAX_TIMESTAMP_MS, ReconstructionError, restoreObservation } from './observation.js';
 import { reconstructHand } from './reconstruct.js';
 import {
   MAX_SCREENSHOTS, RECONSTRUCTION_KIND, RECONSTRUCTION_SCHEMA_VERSION,
-  type HandObservation, type IntervalResolution, type ManualAction, type ManualActionType, type ReconstructionSession, type ScreenshotEntry,
+  type HandObservation, type HiddenMark, type IdentityOverride, type IntervalResolution, type ManualAction, type ManualActionType, type ReconstructionSession, type ScreenshotEntry,
 } from './types.js';
 
 // ---------------------------------------------------------------------------
@@ -72,7 +72,7 @@ export function remapActionSeats(resolutions: readonly IntervalResolution[], obs
 /** Replace (or add) the resolution for one interval. */
 export function setResolution(resolutions: readonly IntervalResolution[], next: IntervalResolution): IntervalResolution[] {
   const others = resolutions.filter(r => !(r.from === next.from && r.to === next.to));
-  return next.mark === 'none' && !next.actions.length && !next.note ? others : [...others, next];
+  return next.mark === 'none' && !next.actions.length && !next.note && !next.confirmedChanges?.length ? others : [...others, next];
 }
 
 // ---------------------------------------------------------------------------
@@ -83,11 +83,19 @@ export function createSession(input: {
   id: string; title: string; createdAt: string; updatedAt?: string;
   screenshots: readonly ScreenshotEntry[]; observations: readonly HandObservation[]; resolutions: readonly IntervalResolution[];
   imagesSaved?: boolean;
+  identity?: { readonly overrides?: readonly IdentityOverride[]; readonly hidden?: readonly HiddenMark[] };
 }): ReconstructionSession {
   const ids = new Set(input.screenshots.map(s => s.id));
   const observations = input.observations.filter(o => ids.has(o.screenshotId));
+  const obsIds = new Set(observations.map(o => o.id));
   const resolutions = liveResolutions(observations, input.resolutions);
   const imagesSaved = input.imagesSaved === true && input.screenshots.some(s => s.image);
+  const identity = {
+    overrides: (input.identity?.overrides ?? []).filter(o => obsIds.has(o.observationId)).map(o => ({ ...o })),
+    hidden: (input.identity?.hidden ?? []).filter(h => obsIds.has(h.observationId)).map(h => ({ ...h })),
+  };
+  const result = reconstructHand(observations, { resolutions, screenshotCount: input.screenshots.length, identity });
+  const sources = new Set(input.screenshots.map(s => s.source ?? 'screenshot'));
   return {
     kind: RECONSTRUCTION_KIND,
     schemaVersion: RECONSTRUCTION_SCHEMA_VERSION,
@@ -98,8 +106,11 @@ export function createSession(input: {
     screenshots: input.screenshots.map(s => (imagesSaved || !s.image ? { ...s } : { id: s.id, label: s.label, uploadIndex: s.uploadIndex })),
     observations,
     resolutions,
-    warnings: [...reconstructHand(observations, { resolutions, screenshotCount: input.screenshots.length }).warnings],
+    warnings: [...result.warnings],
     imagesSaved,
+    sourceType: sources.size > 1 ? 'mixed' : sources.has('video') ? 'video' : 'screenshots',
+    identity,
+    validation: result.intervals.map(i => ({ from: i.from, to: i.to, status: i.status, consistency: i.consistency })),
   };
 }
 
@@ -124,9 +135,14 @@ function parseResolution(raw: unknown): IntervalResolution {
   if (!['none', 'unresolved', 'different-hands'].includes(raw.mark as string)) throw new ReconstructionError('An interval resolution has an unknown mark.');
   if (!Array.isArray(raw.actions)) throw new ReconstructionError('An interval resolution needs an action list.');
   if (raw.note !== undefined && typeof raw.note !== 'string') throw new ReconstructionError('A resolution note must be text.');
+  const confirmed = raw.confirmedChanges;
+  if (confirmed !== undefined && (!Array.isArray(confirmed) || confirmed.some(c => typeof c !== 'string' || c.length > 100))) {
+    throw new ReconstructionError('Confirmed changes must be a list of change keys.');
+  }
   return {
     from: raw.from, to: raw.to, mark: raw.mark as IntervalResolution['mark'], actions: raw.actions.map(parseAction),
     ...(typeof raw.note === 'string' ? { note: raw.note.slice(0, 500) } : {}),
+    ...(Array.isArray(confirmed) && confirmed.length ? { confirmedChanges: [...new Set(confirmed as string[])] } : {}),
   };
 }
 
@@ -136,7 +152,49 @@ function parseScreenshot(raw: unknown): ScreenshotEntry {
   if (raw.image !== undefined && (typeof raw.image !== 'string' || !raw.image.startsWith('data:image/jpeg;base64,'))) {
     throw new ReconstructionError('A saved screenshot image must be a JPEG data URL.');
   }
-  return { id: raw.id, label: raw.label.slice(0, 200), uploadIndex: raw.uploadIndex as number, ...(typeof raw.image === 'string' ? { image: raw.image } : {}) };
+  if (raw.source !== undefined && raw.source !== 'screenshot' && raw.source !== 'video') throw new ReconstructionError('A frame source must be screenshot or video.');
+  if (raw.timestampMs !== undefined && (raw.source !== 'video' || !Number.isSafeInteger(raw.timestampMs) || (raw.timestampMs as number) < 0 || (raw.timestampMs as number) > MAX_TIMESTAMP_MS)) {
+    throw new ReconstructionError('Only video frames have a time, in whole milliseconds.');
+  }
+  return {
+    id: raw.id, label: raw.label.slice(0, 200), uploadIndex: raw.uploadIndex as number,
+    ...(typeof raw.image === 'string' ? { image: raw.image } : {}),
+    ...(raw.source === 'video' ? { source: 'video' as const } : {}),
+    ...(raw.timestampMs !== undefined ? { timestampMs: raw.timestampMs as number } : {}),
+  };
+}
+
+const isId = (v: unknown): v is string => typeof v === 'string' && v.length > 0 && v.length <= 200;
+
+function parseIdentity(raw: unknown, obsIds: ReadonlySet<string>) {
+  if (raw === undefined) return { overrides: [], hidden: [] };
+  if (!isRecord(raw) || !Array.isArray(raw.overrides) || !Array.isArray(raw.hidden)) throw new ReconstructionError('Player matches must list overrides and hidden players.');
+  const overrides = raw.overrides.map((o: unknown): IdentityOverride => {
+    if (!isRecord(o) || !isId(o.observationId) || !isId(o.playerId) || !Number.isSafeInteger(o.seat) || (o.seat as number) < 0) {
+      throw new ReconstructionError('A player match needs a frame, a seat, and a player.');
+    }
+    if (!obsIds.has(o.observationId)) throw new ReconstructionError('A player match refers to a missing frame.');
+    return { observationId: o.observationId, seat: o.seat as number, playerId: o.playerId };
+  });
+  const hidden = raw.hidden.map((h: unknown): HiddenMark => {
+    if (!isRecord(h) || !isId(h.observationId) || !isId(h.playerId)) throw new ReconstructionError('A hidden-player mark needs a frame and a player.');
+    if (!obsIds.has(h.observationId)) throw new ReconstructionError('A hidden-player mark refers to a missing frame.');
+    return { observationId: h.observationId, playerId: h.playerId };
+  });
+  return { overrides, hidden };
+}
+
+/** Upgrades keyed by the version they upgrade from. Version 1 had no identity, frame sources, or validation. */
+const MIGRATIONS: Record<number, (raw: Raw) => Raw> = {
+  1: raw => ({ ...raw, schemaVersion: 2, identity: { overrides: [], hidden: [] } }),
+};
+
+function migrate(raw: Raw): Raw {
+  let current = raw;
+  while (typeof current.schemaVersion === 'number' && current.schemaVersion < RECONSTRUCTION_SCHEMA_VERSION && MIGRATIONS[current.schemaVersion]) {
+    current = MIGRATIONS[current.schemaVersion](current);
+  }
+  return current;
 }
 
 /**
@@ -153,6 +211,7 @@ export function parseSession(input: unknown): ReconstructionSession {
       throw new ReconstructionError('This file is not valid JSON.');
     }
   }
+  if (isRecord(raw) && raw.kind === RECONSTRUCTION_KIND) raw = migrate(raw);
   if (!isRecord(raw) || raw.kind !== RECONSTRUCTION_KIND) throw new ReconstructionError('This is not a Poker Study reconstruction.');
   if (raw.schemaVersion !== RECONSTRUCTION_SCHEMA_VERSION) {
     throw new ReconstructionError(Number(raw.schemaVersion) > RECONSTRUCTION_SCHEMA_VERSION
@@ -174,7 +233,11 @@ export function parseSession(input: unknown): ReconstructionSession {
   if (new Set(observations.map(o => o.screenshotId)).size !== observations.length) throw new ReconstructionError('Each screenshot has at most one observation.');
   for (const o of observations) {
     if (!shotIds.has(o.screenshotId)) throw new ReconstructionError('Observation ' + o.id + ' refers to a missing screenshot.');
-    if (screenshots.findIndex(s => s.id === o.screenshotId) !== o.sequenceIndex) throw new ReconstructionError('Observation ' + o.id + ' is out of order with its screenshot.');
+    const at = screenshots.findIndex(s => s.id === o.screenshotId);
+    if (at !== o.sequenceIndex) throw new ReconstructionError('Observation ' + o.id + ' is out of order with its screenshot.');
+    if ((screenshots[at].source ?? 'screenshot') !== o.source || (screenshots[at].timestampMs ?? null) !== o.timestampMs) {
+      throw new ReconstructionError('Observation ' + o.id + ' does not match its frame’s source or time.');
+    }
   }
   const resolutions = raw.resolutions.map(parseResolution);
   const obsIds = new Set(observations.map(o => o.id));
@@ -184,5 +247,6 @@ export function parseSession(input: unknown): ReconstructionSession {
   return createSession({
     id: raw.id, title: raw.title, createdAt: raw.createdAt as string, updatedAt: raw.updatedAt as string,
     screenshots, observations, resolutions, imagesSaved: raw.imagesSaved === true,
+    identity: parseIdentity(raw.identity, obsIds),
   });
 }
