@@ -8,7 +8,7 @@ The replay reducer accepts study events for a simulation or a completed hand. Ca
 - `applyHoldemEvent(state, event)` returns a new state. An invalid event throws an error and leaves the input state intact.
 - `replayHoldem(config, events)` applies a history in order from the opening state. It throws at the first invalid event.
 - `amountToCall(state)` gives the acting seat's chip cost, or `null` when there is no decision.
-- `toHoldemSnapshot(state)` returns the existing analyzer's snapshot from the acting seat's perspective. That seat's hole cards must be known. Supply only opponent cards you intend to reveal to the analysis.
+- `toHoldemSnapshot(state)` returns the analyzer's version 2 snapshot from the acting seat's perspective, with the other seat as its single opponent. The analyzer also accepts three and four players, but replay stays heads-up. That seat's hole cards must be known. Supply only opponent cards you intend to reveal to the analysis.
 
 Every player event has a `seat`. `bet` and `raise` also have a `to` amount in total chips committed on the current street. `call` calculates the matching amount automatically. The `deal` event takes `cards` and advances a closed betting round to the flop, turn, or river. Supply only the newly dealt cards. The state exposes the current street, actor, phase, pot, both stacks and street commitments, and the minimum opening bet or last full raise increment.
 

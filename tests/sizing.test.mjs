@@ -3,8 +3,12 @@
 // opponent holding, so the sampled strength order does not matter.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { analyze } from '../dist/core/analyze.js';
-import { betAdvice, foldFrequency } from '../dist/core/sizing.js';
+import { analyze as analyzeSnapshot } from '../dist/core/analyze.js';
+import { betAdvice as adviceFor, foldFrequency } from '../dist/core/sizing.js';
+import { headsUp } from './helpers.mjs';
+
+const analyze = s => analyzeSnapshot(headsUp(s));
+const betAdvice = (s, rules) => adviceFor(headsUp(s), rules);
 import { holdem } from '../dist/rules/holdem.js';
 
 const spot = {

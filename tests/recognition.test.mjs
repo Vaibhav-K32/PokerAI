@@ -9,12 +9,12 @@ import { buildRequest, createRecognizeHandler, MAX_IMAGE_BYTES, MODEL, RESULT_SC
 const card = (code, confidence = 'high') => ({ card: code, confidence });
 const payload = (result, modelId = 'claude-opus-5-5') => ({
   modelId,
-  result: { opponent: [], board: [], hero: [], issues: [], ...result },
+  result: { opponents: [], board: [], hero: [], issues: [], ...result },
 });
 
 test('maps rows to table slots with confidence labels and unreadable cards', () => {
   const recognition = toRecognition(payload({
-    opponent: [card('Qh', 'medium'), card('unknown', 'low')],
+    opponents: [[card('Qh', 'medium'), card('unknown', 'low')]],
     board: [card('Ts'), card('9s'), card('2d')],
     hero: [card('As'), card('Ks')],
     issues: ['Glare on the opponent cards.'],
@@ -23,7 +23,7 @@ test('maps rows to table slots with confidence labels and unreadable cards', () 
   assert.equal(recognition.modelId, 'claude-opus-5-5');
   assert.deepEqual(recognition.issues, ['Glare on the opponent cards.']);
   assert.deepEqual(recognition.slots.map(s => s.slot), [
-    'opponent-1', 'opponent-2', 'board-1', 'board-2', 'board-3', 'hero-1', 'hero-2',
+    'opponent-1-1', 'opponent-1-2', 'board-1', 'board-2', 'board-3', 'hero-1', 'hero-2',
   ]);
   const unreadable = recognition.slots[1];
   assert.deepEqual(unreadable.candidates, []);
@@ -32,6 +32,19 @@ test('maps rows to table slots with confidence labels and unreadable cards', () 
   assert.equal(recognition.slots[5].group, 'hero');
   assert.equal(recognition.slots[5].index, 0);
   assert.ok(recognition.slots.every(s => !s.duplicate));
+});
+
+test('maps opponent pairs to seats left to right, keeping face-down seats', () => {
+  const recognition = toRecognition(payload({
+    opponents: [[card('Qh'), card('Qd')], [], [card('7c'), card('7d')]],
+    hero: [card('As'), card('Ks')],
+  }));
+  assert.equal(recognition.opponentSeats, 3);
+  const seats = recognition.slots.filter(s => s.group === 'opponent').map(s => [s.slot, s.seat, s.index]);
+  assert.deepEqual(seats, [['opponent-1-1', 1, 0], ['opponent-1-2', 1, 1], ['opponent-3-1', 3, 0], ['opponent-3-2', 3, 1]]);
+  assert.throws(() => toRecognition(payload({ opponents: [[], [], [], []] })), /more than 3 opponents/);
+  assert.throws(() => toRecognition(payload({ opponents: [[card('2c'), card('3c'), card('4c')]] })), /opponent pair in the photo has more than 2/);
+  assert.throws(() => toRecognition(payload({ opponents: 'none' })), /malformed/);
 });
 
 test('flags the same card read in two slots', () => {
@@ -53,7 +66,8 @@ test('rejects malformed, oversized, and invalid recognition payloads', () => {
 });
 
 test('the request schema matches the slot limits the client enforces', () => {
-  assert.deepEqual(RESULT_SCHEMA.required, ['opponent', 'board', 'hero', 'issues']);
+  assert.deepEqual(RESULT_SCHEMA.required, ['opponents', 'board', 'hero', 'issues']);
+  assert.equal(RESULT_SCHEMA.properties.opponents.items.type, 'array');
   const codes = RESULT_SCHEMA.properties.hero.items.properties.card.enum;
   assert.equal(codes.length, 53);
   assert.ok(codes.includes('Td') && codes.includes('unknown'));
@@ -96,7 +110,7 @@ function fakeClient(reply) {
   };
 }
 
-const okResult = { opponent: [], board: [card('Qs'), card('Js'), card('4d')], hero: [card('As'), card('Ks')], issues: [] };
+const okResult = { opponents: [], board: [card('Qs'), card('Js'), card('4d')], hero: [card('As'), card('Ks')], issues: [] };
 
 test('endpoint forwards one same-origin image and returns the parsed cards', async () => {
   const fake = fakeClient(() => ({

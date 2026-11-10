@@ -2,8 +2,12 @@
 // from the unseen deck, independently of the implementation.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { analyze } from '../dist/core/analyze.js';
-import { handOutlook } from '../dist/core/outlook.js';
+import { analyze as analyzeSnapshot } from '../dist/core/analyze.js';
+import { handOutlook as outlookOf } from '../dist/core/outlook.js';
+import { headsUp } from './helpers.mjs';
+
+const analyze = s => analyzeSnapshot(headsUp(s));
+const handOutlook = (s, rules) => outlookOf(headsUp(s), rules);
 import { holdem } from '../dist/rules/holdem.js';
 
 const base = {
@@ -138,7 +142,7 @@ test('known opponent: per-hand matchups match a hand count', () => {
 
   const royal = row(outlook, 'Straight flush');
   assert.equal(royal.byRiver, 1 / 44);
-  assert.deepEqual(royal.matchup, { win: 1, tie: 0, loss: 0, beatenBy: [] });
+  assert.deepEqual(royal.matchup, { win: 1, tie: 0, loss: 0, share: 1, beatenBy: [] });
 
   const flush = row(outlook, 'Flush');
   assert.equal(flush.byRiver, 8 / 44);

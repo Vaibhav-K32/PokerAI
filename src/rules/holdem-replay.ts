@@ -180,17 +180,19 @@ export function toHoldemSnapshot(state: HoldemReplayState): Snapshot {
   if (seat === null) throw new Error('There is no betting decision to analyze.');
   const opponent = other(seat);
   const snapshot: Snapshot = {
-    version: 1,
+    version: 2,
     ruleset: holdem.id,
     purpose: state.purpose,
     hero: [...state.holeCards[seat]],
-    opponent: [...state.holeCards[opponent]],
     board: [...state.board],
+    opponents: [{
+      stack: state.stacks[opponent],
+      committed: state.committed[opponent],
+      cards: [...state.holeCards[opponent]],
+    }],
     pot: state.pot,
     heroStack: state.stacks[seat],
-    opponentStack: state.stacks[opponent],
     committed: state.committed[seat],
-    faced: state.committed[opponent] - state.committed[seat],
     increment: state.minIncrement,
   };
   holdem.validate(snapshot);

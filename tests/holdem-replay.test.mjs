@@ -116,9 +116,10 @@ test('the existing analyzer accepts the acting seat snapshot and only sees dealt
   const state = replayHoldem(config, history);
   const snapshot = toHoldemSnapshot(state);
   assert.deepEqual(snapshot, {
-    version: 1, ruleset: 'holdem-nl-hu', purpose: 'completed',
-    hero: ['Ad', 'Kd'], opponent: ['As', 'Ks'], board: ['Qs', 'Js', '4d'],
-    pot: 12, heroStack: 98, opponentStack: 90, committed: 0, faced: 8, increment: 8,
+    version: 2, ruleset: 'holdem-nl', purpose: 'completed',
+    hero: ['Ad', 'Kd'], board: ['Qs', 'Js', '4d'],
+    opponents: [{ stack: 90, committed: 8, cards: ['As', 'Ks'] }],
+    pot: 12, heroStack: 98, committed: 0, increment: 8,
   });
   const result = analyze(snapshot);
   assert.deepEqual(result.actions, [
@@ -175,5 +176,5 @@ test('allows unknown seats during replay and requires the acting hand for analys
   assert.throws(() => toHoldemSnapshot(state), /two hero cards/);
   const snapshot = toHoldemSnapshot(applyHoldemEvent(state, raise(0, 6)));
   assert.deepEqual(snapshot.hero, ['Ad', 'Kd']);
-  assert.deepEqual(snapshot.opponent, []);
+  assert.deepEqual(snapshot.opponents, [{ stack: 94, committed: 6, cards: [] }]);
 });

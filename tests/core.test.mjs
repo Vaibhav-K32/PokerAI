@@ -1,8 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { analyze } from '../dist/core/analyze.js';
+import { analyze as analyzeSnapshot } from '../dist/core/analyze.js';
+import { headsUp } from './helpers.mjs';
 import { parseCards, compareRank } from '../dist/core/cards.js';
-import { holdem } from '../dist/rules/holdem.js';
+import { holdem as rules } from '../dist/rules/holdem.js';
+
+const analyze = s => analyzeSnapshot(headsUp(s));
+const holdem = { ...rules, legalActions: s => rules.legalActions(headsUp(s)) };
 import { localRecognizer } from '../dist/vision/recognizer.js';
 
 const base = {

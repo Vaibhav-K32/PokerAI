@@ -16,11 +16,11 @@
   <header class="masthead">
     <div class="wrap top">
       <div class="brand"><span aria-hidden="true">♠</span> POKER STUDY</div>
-      <span class="badge">HEADS-UP HOLD’EM</span>
+      <span class="badge">HOLD’EM · 2–4 PLAYERS</span>
     </div>
     <div class="wrap intro">
       <h1>Study the decision.</h1>
-      <p>Set up a simulated spot or reconstruct a completed hand on the table. Tap a card slot to pick a card, or scan a photo of the cards.</p>
+      <p>Set up a simulated spot or reconstruct a completed hand with two to four players. Tap a card slot to pick a card, or scan a photo of the cards.</p>
     </div>
   </header>
   <main class="wrap workspace">
@@ -33,18 +33,38 @@
         </div>
       </div>
       <form id="scenario" autocomplete="off">
-        <div class="felt" role="group" aria-label="Poker table">
-          <div class="seat seat-opponent">
-            <p class="seat-name">Opponent <small>cards optional</small></p>
-            <div class="cards" id="opponent-cards"></div>
-            <label class="chip-field">Stack behind<input id="opponent-stack" type="number" inputmode="numeric" min="0" step="1" required></label>
+        <div class="felt" id="felt" role="group" aria-label="Poker table" data-opponents="1">
+          <div class="opponent-seats">
+            <div class="seat seat-opponent" id="seat-opp1">
+              <p class="seat-name"><span id="opp1-name">Opponent</span> <small>cards optional</small></p>
+              <div class="cards" id="opp1-cards"></div>
+              <label class="chip-field">Stack behind<input id="opp1-stack" type="number" inputmode="numeric" min="0" step="1" required></label>
+              <label class="chip-field bet">Bet this street<input id="opp1-bet" type="number" inputmode="numeric" min="0" step="1" value="0" required></label>
+              <label class="chip-field cap" id="opp1-cap-field" hidden>All-in earlier · pot they can win<input id="opp1-cap" type="number" inputmode="numeric" min="1" step="1" placeholder="All of it"></label>
+            </div>
+            <div class="seat seat-opponent" id="seat-opp2" hidden>
+              <p class="seat-name"><span id="opp2-name">Opponent 2</span> <small>cards optional</small></p>
+              <div class="cards" id="opp2-cards"></div>
+              <label class="chip-field">Stack behind<input id="opp2-stack" type="number" inputmode="numeric" min="0" step="1"></label>
+              <label class="chip-field bet">Bet this street<input id="opp2-bet" type="number" inputmode="numeric" min="0" step="1" value="0"></label>
+              <label class="chip-field cap" id="opp2-cap-field" hidden>All-in earlier · pot they can win<input id="opp2-cap" type="number" inputmode="numeric" min="1" step="1" placeholder="All of it"></label>
+            </div>
+            <div class="seat seat-opponent" id="seat-opp3" hidden>
+              <p class="seat-name"><span id="opp3-name">Opponent 3</span> <small>cards optional</small></p>
+              <div class="cards" id="opp3-cards"></div>
+              <label class="chip-field">Stack behind<input id="opp3-stack" type="number" inputmode="numeric" min="0" step="1"></label>
+              <label class="chip-field bet">Bet this street<input id="opp3-bet" type="number" inputmode="numeric" min="0" step="1" value="0"></label>
+              <label class="chip-field cap" id="opp3-cap-field" hidden>All-in earlier · pot they can win<input id="opp3-cap" type="number" inputmode="numeric" min="1" step="1" placeholder="All of it"></label>
+            </div>
           </div>
-          <label class="chip-field bet">To call<input id="faced" type="number" inputmode="numeric" min="0" step="1" value="0" required></label>
           <div class="center">
             <div class="cards board" id="board-cards"></div>
             <label class="chip-field pot">Pot, including current bets<input id="pot" type="number" inputmode="numeric" min="0" step="1" required></label>
           </div>
-          <label class="chip-field bet">Your bet this street<input id="committed" type="number" inputmode="numeric" min="0" step="1" value="0" required></label>
+          <div class="hero-bet">
+            <label class="chip-field bet">Your bet this street<input id="committed" type="number" inputmode="numeric" min="0" step="1" value="0" required></label>
+            <p class="to-call" id="to-call" role="status">Nothing to call</p>
+          </div>
           <div class="seat seat-hero">
             <div class="cards" id="hero-cards"></div>
             <p class="seat-name">You</p>
@@ -53,6 +73,13 @@
         </div>
 
         <div class="fields controls">
+          <label>Players in the hand
+            <select id="players">
+              <option value="2" selected>2 players (heads-up)</option>
+              <option value="3">3 players</option>
+              <option value="4">4 players</option>
+            </select>
+          </label>
           <label>Study context
             <select id="purpose" required>
               <option value="">Choose a context</option>
@@ -65,7 +92,7 @@
 
         <details id="photo-panel">
           <summary>Scan a photo of the cards</summary>
-          <p>Lay the cards face-up in three rows: the opponent’s cards farthest away, the board in the middle, and your cards nearest the camera. Chips and bets are not read; enter them on the table.</p>
+          <p>Lay the cards out in three rows: each opponent’s pair farthest away, left to right in seat order (face-down is fine), the board in the middle, and your cards nearest the camera. Chips and bets are not read; enter them on the table.</p>
           <div class="fields">
             <label>Choose a photo<input type="file" id="photo-file" accept="image/jpeg,image/png,image/webp"></label>
             <label>Take a photo, if supported<input type="file" id="photo-camera" accept="image/jpeg,image/png,image/webp" capture="environment"></label>
@@ -112,6 +139,6 @@
     </form>
   </dialog>
 
-  <footer class="wrap">Heads-up no-limit Hold’em · For simulation and post-hand review <span id="offline-status"></span></footer>
+  <footer class="wrap">No-limit Hold’em for 2–4 players · For simulation and post-hand review <span id="offline-status"></span></footer>
 </body>
 </html>

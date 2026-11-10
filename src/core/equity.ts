@@ -1,75 +1,91 @@
-import { combinations, compareRank } from './cards.js';
+import { combinations } from './cards.js';
+import { choose, deadMoney, faced, heroPayout, knownCards, potCaps, scorer, seededRandom } from './table.js';
 import type { Card, Equity, Ruleset, Snapshot } from './types.js';
 
-function choose(n: number, k: number): number {
-  let count = 1;
-  for (let i = 1; i <= k; i++) count = count * (n - i + 1) / i;
-  return Math.round(count);
-}
+const EXACT_LIMIT = 3000;
+const SAMPLES = 2500;
 
-function seededRandom(seed: number): () => number {
-  let state = seed >>> 0;
-  return () => {
-    state = (state + 0x6d2b79f5) >>> 0;
-    let value = Math.imul(state ^ (state >>> 15), state | 1);
-    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
-    return ((value ^ (value >>> 14)) >>> 0) / 2 ** 32;
-  };
-}
-
+/**
+ * Showdown equity against every opponent still in the hand. Unknown opponents
+ * hold uniformly random hands. Outcomes are enumerated when there are at most
+ * 3,000 of them and sampled otherwise. When the hero faces a wager, also
+ * returns the expected chips collected from the main and side pots after
+ * calling, with opponents staying at their current commitments.
+ */
 export function calculateEquity(s: Snapshot, rules: Ruleset): Equity {
   rules.validate(s);
-  const used = new Set([...s.hero, ...s.board, ...s.opponent]);
+  const evaluate = scorer(rules);
+  const used = new Set(knownCards(s));
   const remaining = rules.deck.filter(card => !used.has(card));
-  const unknownHole = s.opponent.length ? 0 : rules.holeCount;
+  const unknownSeats = s.opponents.flatMap((o, i) => (o.cards.length ? [] : [i]));
   const unknownBoard = rules.showdownBoardCount - s.board.length;
-  const exact = choose(remaining.length, unknownHole)
-    * choose(remaining.length - unknownHole, unknownBoard) <= 3000;
+  let outcomes = choose(remaining.length - unknownSeats.length * rules.holeCount, unknownBoard);
+  unknownSeats.forEach((_, k) => { outcomes *= choose(remaining.length - k * rules.holeCount, rules.holeCount); });
+  const exact = outcomes <= EXACT_LIMIT;
+
+  const toCall = faced(s);
+  const contributions = [s.committed + Math.min(toCall, s.heroStack), ...s.opponents.map(o => o.committed)];
+  const base = deadMoney(s);
+  const caps = potCaps(s);
+
   let wins = 0;
   let ties = 0;
+  let tieShare = 0;
+  let winnings = 0;
   let trials = 0;
-  // Prefer the ruleset's fast score; it orders hands exactly like `rank`.
-  const compare = rules.score
-    ? (board: readonly Card[], hole: readonly Card[]) =>
-      rules.score!(s.hero, board) - rules.score!([...s.opponent, ...hole], board)
-    : (board: readonly Card[], hole: readonly Card[]) => {
-      const hero = rules.rank(s.hero, board);
-      const opponent = rules.rank([...s.opponent, ...hole], board);
-      if (!hero || !opponent) throw new Error('Ruleset did not produce a showdown rank.');
-      return compareRank(hero.value, opponent.value);
-    };
-
-  function record(hole: readonly Card[], runout: readonly Card[]) {
-    const order = compare([...s.board, ...runout], hole);
-    if (order > 0) wins++;
-    if (order === 0) ties++;
+  function record(holes: readonly (readonly Card[])[], runout: readonly Card[]) {
+    const board = [...s.board, ...runout];
+    let next = 0;
+    const scores = [evaluate(s.hero, board), ...s.opponents.map(o => evaluate(o.cards.length ? o.cards : holes[next++], board))];
+    const hero = scores[0];
+    let best = -Infinity;
+    let level = 0;
+    for (let i = 1; i < scores.length; i++) {
+      if (scores[i] > best) { best = scores[i]; level = 1; } else if (scores[i] === best) level++;
+    }
+    if (hero > best) wins++;
+    else if (hero === best) {
+      ties++;
+      tieShare += 1 / (level + 1);
+    }
+    if (toCall) winnings += heroPayout(scores, contributions, base, caps);
     trials++;
   }
 
   if (exact) {
-    for (const hole of combinations(remaining, unknownHole)) {
-      const boardPool = remaining.filter(card => !hole.includes(card));
-      for (const runout of combinations(boardPool, unknownBoard)) record(hole, runout);
-    }
+    const deal = (pool: readonly Card[], holes: (readonly Card[])[]) => {
+      if (holes.length === unknownSeats.length) {
+        for (const runout of combinations(pool, unknownBoard)) record(holes, runout);
+        return;
+      }
+      for (const hole of combinations(pool, rules.holeCount)) {
+        deal(pool.filter(card => !hole.includes(card)), [...holes, hole]);
+      }
+    };
+    deal(remaining, []);
   } else {
     const random = seededRandom(20261);
-    const draws = unknownHole + unknownBoard;
-    for (let trial = 0; trial < 2500; trial++) {
+    const holeCards = unknownSeats.length * rules.holeCount;
+    const draws = holeCards + unknownBoard;
+    for (let trial = 0; trial < SAMPLES; trial++) {
       const pool = [...remaining];
       for (let i = 0; i < draws; i++) {
         const j = i + Math.floor(random() * (pool.length - i));
         [pool[i], pool[j]] = [pool[j], pool[i]];
       }
-      record(pool.slice(0, unknownHole), pool.slice(unknownHole, draws));
+      const holes = unknownSeats.map((_, k) => pool.slice(k * rules.holeCount, (k + 1) * rules.holeCount));
+      record(holes, pool.slice(holeCards, draws));
     }
   }
 
-  const share = (wins + ties / 2) / trials;
-  // Hoeffding bound for outcomes in [0, 1], including half a pot for ties.
+  const share = (wins + tieShare) / trials;
+  // Hoeffding bound for outcomes in [0, 1], including split shares for ties.
   const radius = exact ? 0 : Math.sqrt(Math.log(40) / (2 * trials));
-  return {
+  const equity: Equity = {
     method: exact ? 'exact' : 'sampled', trials, share,
     win: wins / trials, tie: ties / trials, loss: (trials - wins - ties) / trials,
     interval: [Math.max(0, share - radius), Math.min(1, share + radius)],
   };
+  if (toCall) equity.callWinnings = winnings / trials;
+  return equity;
 }

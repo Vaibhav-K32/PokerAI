@@ -1,17 +1,35 @@
 export type Card = string;
 
+/** An opponent still in the hand. */
+export interface Seat {
+  /** Chips behind. Zero means all-in on this street. */
+  stack: number;
+  /** Chips committed on the current street. */
+  committed: number;
+  /** Two known cards, or empty when unknown. */
+  cards: readonly Card[];
+  /**
+   * For a player all-in on an earlier street (no stack, nothing committed
+   * this street): how much of the pot from earlier streets they can win.
+   * Omit it when they can win all of it.
+   */
+  eligiblePot?: number;
+}
+
 export interface Snapshot {
-  version: 1;
+  version: 2;
   ruleset: string;
   purpose: 'simulation' | 'completed';
   hero: readonly Card[];
   board: readonly Card[];
-  opponent: readonly Card[]; // Empty means an unknown hand.
+  /** One to three opponents still in the hand. Folded players are not seated. */
+  opponents: readonly Seat[];
+  /** Everything in the middle, including current-street bets and dead money. */
   pot: number;
   heroStack: number;
-  opponentStack: number;
+  /** Hero chips committed on the current street. */
   committed: number;
-  faced: number;
+  /** Minimum opening bet or last full raise increment. */
   increment: number;
 }
 
@@ -32,8 +50,14 @@ export interface Equity {
   win: number;
   tie: number;
   loss: number;
+  /** Win plus split shares of ties (half heads-up, a third three ways, ...). */
   share: number;
   interval: readonly [number, number];
+  /**
+   * When facing a wager: expected chips collected from the main and side pots
+   * after calling, with every opponent staying at their current commitment.
+   */
+  callWinnings?: number;
 }
 
 export interface OutlookRow {
@@ -57,19 +81,24 @@ export interface Matchup {
   win: number;
   tie: number;
   loss: number;
+  /** Pot share: win plus split shares of ties. */
+  share: number;
   /** Opponent hands that win, as a share of the matchups for this row. */
   beatenBy: readonly { name: string; chance: number }[];
 }
 
 export interface OpponentOutlook {
+  /** 'known' only when every opponent's cards are known. */
   model: 'known' | 'random';
   method: 'exact' | 'sampled';
+  /** Opponents in the hand. With several, rows describe the strongest one. */
+  players: number;
   matchups: number;
-  /** Opponent showdown equity, including half of ties. */
+  /** Combined opponent showdown equity, including split shares of ties. */
   equity: number;
-  /** Chance the opponent finishes ahead of the hero. */
+  /** Chance some opponent finishes ahead of the hero. */
   beatsYou: number;
-  /** Opponent final categories: how often they make it, and make it and win. */
+  /** Final categories of the strongest opponent hand: how often, and how often it wins. */
   rows: readonly { category: number; name: string; chance: number; beatsYou: number }[];
 }
 
@@ -132,6 +161,10 @@ export interface BetAdvice {
   /** True when using one style's best action against another costs over 2% of the pot. */
   sensitive: boolean;
   opponent: 'known' | 'random';
+  /** Opponents in the hand. */
+  players: number;
+  /** Heads-up uses exact range weights; several opponents use sampled deals. */
+  method: 'exact' | 'sampled';
   /** Opponent holdings in the modeled range. */
   holdings: number;
   /** Board cards still to come; the model assumes no betting on them. */

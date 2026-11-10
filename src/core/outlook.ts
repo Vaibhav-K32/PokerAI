@@ -1,4 +1,5 @@
 import { combinations } from './cards.js';
+import { choose, draw, knownCards, scorer, seededRandom } from './table.js';
 import type {
   Card, Matchup, OpponentOutlook, Outlook, OutlookRow, Ruleset, Snapshot, Suggestion,
 } from './types.js';
@@ -10,50 +11,14 @@ const EXACT_MATCHUPS = 250_000;
 const SAMPLED_MATCHUPS = 100_000;
 const CATEGORY_BASE = 16 ** 5;
 
-function choose(n: number, k: number): number {
-  let count = 1;
-  for (let i = 1; i <= k; i++) count = count * (n - i + 1) / i;
-  return Math.round(count);
-}
-
-function seededRandom(seed: number): () => number {
-  let state = seed >>> 0;
-  return () => {
-    state = (state + 0x6d2b79f5) >>> 0;
-    let value = Math.imul(state ^ (state >>> 15), state | 1);
-    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
-    return ((value ^ (value >>> 14)) >>> 0) / 2 ** 32;
-  };
-}
-
-/** Partial Fisher-Yates: the first `count` entries become a random draw. */
-function draw<T>(pool: T[], count: number, random: () => number): T[] {
-  for (let i = 0; i < count; i++) {
-    const j = i + Math.floor(random() * (pool.length - i));
-    [pool[i], pool[j]] = [pool[j], pool[i]];
-  }
-  return pool.slice(0, count);
-}
-
-/** A comparable showdown score, using the ruleset's fast path when it has one. */
-function scorer(rules: Ruleset): (hole: readonly Card[], board: readonly Card[]) => number {
-  if (rules.score) return rules.score.bind(rules);
-  return (hole, board) => {
-    const rank = rules.rank(hole, board);
-    if (!rank) throw new Error('Ruleset did not produce a hand rank.');
-    let value = 0;
-    for (let i = 0; i < 6; i++) value = value * 16 + (rank.value[i] ?? 0);
-    return value;
-  };
-}
-
-interface Tally { hands: number; win: number; tie: number; loss: number; beatenBy: Map<string, number> }
+interface Tally { hands: number; win: number; tie: number; loss: number; share: number; beatenBy: Map<string, number> }
 
 /**
  * The hero's chances of finishing with each hand category, how each finished
- * hand fares against the opponent, and which hands carry the hero's equity.
- * Every unseen card counts as equally likely. A known opponent hand is used
- * exactly; otherwise the opponent holds a uniformly random hand.
+ * hand fares at showdown, and which hands carry the hero's equity. Every
+ * unseen card counts as equally likely. Known opponent hands are used
+ * exactly; unknown opponents hold uniformly random hands. With several
+ * opponents, the hero must beat the strongest of them.
  * Returns null when the board is already complete.
  */
 export function handOutlook(s: Snapshot, rules: Ruleset): Outlook | null {
@@ -62,7 +27,7 @@ export function handOutlook(s: Snapshot, rules: Ruleset): Outlook | null {
   const evaluate = scorer(rules);
   const categoryOf = (value: number) => Math.floor(value / CATEGORY_BASE);
   const names = rules.categories;
-  const used = new Set([...s.hero, ...s.board, ...s.opponent]);
+  const used = new Set(knownCards(s));
   const unseen = rules.deck.filter(card => !used.has(card));
   const random = seededRandom(20262);
   const current = s.board.length ? categoryOf(evaluate(s.hero, s.board)) : null;
@@ -73,11 +38,13 @@ export function handOutlook(s: Snapshot, rules: Ruleset): Outlook | null {
     ? [...combinations(unseen, toCome)]
     : Array.from({ length: SAMPLE_RUNOUTS }, () => draw([...unseen], toCome, random));
 
-  // Opponent hands per board.
-  const knownOpponent = s.opponent.length === rules.holeCount;
-  const holesPerBoard = knownOpponent ? 1 : choose(unseen.length - toCome, rules.holeCount);
-  const exactMatchups = knownOpponent || runouts.length * holesPerBoard <= EXACT_MATCHUPS;
-  const samplesPerBoard = exactMatchups ? holesPerBoard : Math.ceil(SAMPLED_MATCHUPS / runouts.length);
+  // Opponent hands per board: fixed when known; every hand for a single
+  // unknown opponent when affordable; otherwise sampled deals.
+  const unknownSeats = s.opponents.flatMap((o, i) => (o.cards.length ? [] : [i]));
+  const allKnown = unknownSeats.length === 0;
+  const singleCombos = unknownSeats.length === 1 ? choose(unseen.length - toCome, rules.holeCount) : Infinity;
+  const exactMatchups = allKnown || runouts.length * singleCombos <= EXACT_MATCHUPS;
+  const samplesPerBoard = Math.ceil(SAMPLED_MATCHUPS / runouts.length);
 
   const finals = new Map<number, number>();
   const tallies = new Map<number, Tally>();
@@ -90,24 +57,37 @@ export function handOutlook(s: Snapshot, rules: Ruleset): Outlook | null {
     const heroCategory = categoryOf(heroScore);
     finals.set(heroCategory, (finals.get(heroCategory) ?? 0) + 1);
     let tally = tallies.get(heroCategory);
-    if (!tally) tallies.set(heroCategory, tally = { hands: 0, win: 0, tie: 0, loss: 0, beatenBy: new Map() });
+    if (!tally) tallies.set(heroCategory, tally = { hands: 0, win: 0, tie: 0, loss: 0, share: 0, beatenBy: new Map() });
 
-    const rest = knownOpponent ? [] : unseen.filter(card => !runout.includes(card));
-    const holes: Iterable<readonly Card[]> = knownOpponent
-      ? [s.opponent]
+    const rest = unseen.filter(card => !runout.includes(card));
+    const deals: Iterable<readonly (readonly Card[])[]> = allKnown
+      ? [[]]
       : exactMatchups
-        ? combinations(rest, rules.holeCount)
-        : Array.from({ length: samplesPerBoard }, () => draw(rest, rules.holeCount, random));
-    for (const hole of holes) {
-      const opponentScore = evaluate(hole, board);
-      const opponentCategory = categoryOf(opponentScore);
+        ? (function* () { for (const hole of combinations(rest, rules.holeCount)) yield [hole]; })()
+        : Array.from({ length: samplesPerBoard }, () => {
+          const cards = draw(rest, unknownSeats.length * rules.holeCount, random);
+          return unknownSeats.map((_, k) => cards.slice(k * rules.holeCount, (k + 1) * rules.holeCount));
+        });
+    for (const holes of deals) {
+      let next = 0;
+      let best = -Infinity;
+      let level = 0;
+      for (const o of s.opponents) {
+        const value = evaluate(o.cards.length ? o.cards : holes[next++], board);
+        if (value > best) { best = value; level = 1; } else if (value === best) level++;
+      }
+      const opponentCategory = categoryOf(best);
       const opponent = opponentFinals.get(opponentCategory) ?? { hands: 0, beats: 0 };
       opponent.hands++;
       tally.hands++;
       matchups++;
-      if (heroScore > opponentScore) tally.win++;
-      else if (heroScore === opponentScore) tally.tie++;
-      else {
+      if (heroScore > best) {
+        tally.win++;
+        tally.share++;
+      } else if (heroScore === best) {
+        tally.tie++;
+        tally.share += 1 / (level + 1);
+      } else {
         tally.loss++;
         opponent.beats++;
         const label = opponentCategory === heroCategory
@@ -140,6 +120,7 @@ export function handOutlook(s: Snapshot, rules: Ruleset): Outlook | null {
         win: tally.win / tally.hands,
         tie: tally.tie / tally.hands,
         loss: tally.loss / tally.hands,
+        share: tally.share / tally.hands,
         beatenBy: [...tally.beatenBy]
           .map(([name, count]) => ({ name, chance: count / tally.hands }))
           .sort((a, b) => b.chance - a.chance),
@@ -150,7 +131,7 @@ export function handOutlook(s: Snapshot, rules: Ruleset): Outlook | null {
       name: names[category],
       byRiver,
       improves: current === null || category > current,
-      equityShare: matchup ? byRiver * (matchup.win + matchup.tie / 2) : 0,
+      equityShare: matchup ? byRiver * matchup.share : 0,
     };
     if (matchup) row.matchup = matchup;
     if (nextCard) {
@@ -160,19 +141,19 @@ export function handOutlook(s: Snapshot, rules: Ruleset): Outlook | null {
     return row;
   });
 
-  const opponent: OpponentOutlook = {
-    model: knownOpponent ? 'known' : 'random',
-    method: exact && exactMatchups ? 'exact' : 'sampled',
-    matchups,
-    equity: 0,
-    beatsYou: 0,
-    rows: [...opponentFinals].sort(([a], [b]) => b - a).map(([category, { hands, beats }]) => ({
-      category, name: names[category], chance: hands / matchups, beatsYou: beats / matchups,
-    })),
-  };
   const yourEquity = rows.reduce((sum, row) => sum + row.equityShare, 0);
-  opponent.equity = 1 - yourEquity;
-  opponent.beatsYou = opponent.rows.reduce((sum, row) => sum + row.beatsYou, 0);
+  const opponentRows = [...opponentFinals].sort(([a], [b]) => b - a).map(([category, { hands, beats }]) => ({
+    category, name: names[category], chance: hands / matchups, beatsYou: beats / matchups,
+  }));
+  const opponent: OpponentOutlook = {
+    model: allKnown ? 'known' : 'random',
+    method: exact && exactMatchups ? 'exact' : 'sampled',
+    players: s.opponents.length,
+    matchups,
+    equity: 1 - yourEquity,
+    beatsYou: opponentRows.reduce((sum, row) => sum + row.beatsYou, 0),
+    rows: opponentRows,
+  };
 
   const improveByRiver = rows.filter(row => current !== null && row.category > current)
     .reduce((sum, row) => sum + row.byRiver, 0);
@@ -190,7 +171,7 @@ export function handOutlook(s: Snapshot, rules: Ruleset): Outlook | null {
   };
 }
 
-/** Minimum share of the pot a hand must carry to be worth naming. */
+/** Minimum share of the pot a hand must carry to be worth naming... */
 const NOTABLE_SHARE = 0.02;
 /** ...and at least this part of the hero's own equity. */
 const NOTABLE_PART = 0.1;
@@ -201,7 +182,7 @@ const NOTABLE_PART = 0.1;
  * equity comes from at showdown; it is not a betting recommendation.
  */
 function suggest(rows: readonly OutlookRow[], current: number | null, yourEquity: number): Suggestion {
-  const winRate = (row: OutlookRow) => (row.matchup ? row.matchup.win + row.matchup.tie / 2 : 0);
+  const winRate = (row: OutlookRow) => row.matchup?.share ?? 0;
   const playFor = rows
     .filter(row => row.improves && row.equityShare >= NOTABLE_SHARE && row.equityShare >= NOTABLE_PART * yourEquity)
     .sort((a, b) => b.equityShare - a.equityShare)

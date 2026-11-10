@@ -104,9 +104,10 @@ test('analyzer snapshots take the acting seat perspective in the traced hand', (
   // Preflop, seat 1 (button) faces the 3-bet.
   const facing3Bet = toHoldemSnapshot(states[2]);
   assert.deepEqual(facing3Bet, {
-    version: 1, ruleset: 'holdem-nl-hu', purpose: 'simulation',
-    hero: ['Ah', 'Kh'], opponent: ['Qd', 'Qc'], board: [],
-    pot: 24, heroStack: 194, opponentStack: 182, committed: 6, faced: 12, increment: 12,
+    version: 2, ruleset: 'holdem-nl', purpose: 'simulation',
+    hero: ['Ah', 'Kh'], board: [],
+    opponents: [{ stack: 182, committed: 18, cards: ['Qd', 'Qc'] }],
+    pot: 24, heroStack: 194, committed: 6, increment: 12,
   });
   assert.deepEqual(holdem.legalActions(facing3Bet), [
     { kind: 'fold' }, { kind: 'call', cost: 12 },
@@ -116,8 +117,8 @@ test('analyzer snapshots take the acting seat perspective in the traced hand', (
   // Flop, seat 0 (big blind) acts first with no wager.
   const flopLead = toHoldemSnapshot(states[4]);
   assert.deepEqual(flopLead.hero, ['Qd', 'Qc']);
-  assert.deepEqual(flopLead.opponent, ['Ah', 'Kh']);
-  assert.equal(flopLead.faced, 0);
+  assert.deepEqual(flopLead.opponents[0].cards, ['Ah', 'Kh']);
+  assert.equal(flopLead.opponents[0].committed - flopLead.committed, 0);
   assert.deepEqual(holdem.legalActions(flopLead), [
     { kind: 'check' }, { kind: 'bet', minTo: 2, maxTo: 182, short: false },
   ]);
@@ -125,8 +126,8 @@ test('analyzer snapshots take the acting seat perspective in the traced hand', (
   // River, seat 0 faces an all-in and can only fold or call.
   const facingShove = toHoldemSnapshot(states[15]);
   assert.equal(facingShove.heroStack, 118);
-  assert.equal(facingShove.opponentStack, 0);
-  assert.equal(facingShove.faced, 118);
+  assert.equal(facingShove.opponents[0].stack, 0);
+  assert.equal(facingShove.opponents[0].committed - facingShove.committed, 118);
   assert.equal(facingShove.pot, 282);
   const result = analyze(facingShove);
   assert.deepEqual(result.actions, [{ kind: 'fold' }, { kind: 'call', cost: 118 }]);
@@ -141,7 +142,7 @@ test('analyzer snapshots take the acting seat perspective in the traced hand', (
     assert.deepEqual(snapshot.hero, reversedConfig.holeCards[state.actor]);
     assert.equal(snapshot.heroStack, state.stacks[state.actor]);
     assert.equal(snapshot.committed, state.committed[state.actor]);
-    assert.equal(snapshot.faced, amountToCall(state));
+    assert.equal(snapshot.opponents[0].committed - snapshot.committed, amountToCall(state));
   }
 });
 
@@ -394,8 +395,8 @@ test('seeded random hands match the reference model, conserve chips, and reject 
             // The acting seat's analyzer view mirrors the reducer state.
             const snapshot = toHoldemSnapshot(state);
             assert.deepEqual(snapshot.hero, holeCards[state.actor]);
-            assert.deepEqual(snapshot.opponent, holeCards[1 - state.actor]);
-            assert.equal(snapshot.faced, amountToCall(state));
+            assert.deepEqual(snapshot.opponents[0].cards, holeCards[1 - state.actor]);
+            assert.equal(snapshot.opponents[0].committed - snapshot.committed, amountToCall(state));
             assert.equal(snapshot.pot, refPot(ref));
             event = chooseEvent(ref, random);
           }

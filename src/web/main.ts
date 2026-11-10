@@ -3,7 +3,7 @@ import type { analyze } from '../core/analyze.js';
 import type {
   Action, BetAdvice, BetOption, Card, OpponentStyle, Outlook, OutlookRow, Snapshot,
 } from '../core/types.js';
-import { cloudRecognizer, type Confidence, type Recognition, type SlotGroup } from '../vision/recognizer.js';
+import { cloudRecognizer, type Confidence, type Recognition } from '../vision/recognizer.js';
 
 function element<T extends HTMLElement>(id: string): T {
   const node = document.getElementById(id);
@@ -23,12 +23,20 @@ interface Slot {
   unreadable?: boolean;
 }
 
-const groups: readonly SlotGroup[] = ['opponent', 'board', 'hero'];
-const sizes: Record<SlotGroup, number> = { opponent: 2, board: 5, hero: 2 };
-const emptySlots = () => Object.fromEntries(groups.map(group =>
+type SlotGroup = 'opp1' | 'opp2' | 'opp3' | 'board' | 'hero';
+const allGroups: readonly SlotGroup[] = ['opp1', 'opp2', 'opp3', 'board', 'hero'];
+const seatGroups = ['opp1', 'opp2', 'opp3'] as const;
+const sizes: Record<SlotGroup, number> = { opp1: 2, opp2: 2, opp3: 2, board: 5, hero: 2 };
+const emptySlots = () => Object.fromEntries(allGroups.map(group =>
   [group, Array.from({ length: sizes[group] }, (): Slot => ({ card: null, pending: false }))],
 )) as Record<SlotGroup, Slot[]>;
 let slots = emptySlots();
+
+/** Opponents seated at the table, from the player count selector. */
+let opponentCount = 1;
+const activeSeats = () => seatGroups.slice(0, opponentCount);
+/** Card groups in play: seated opponents, the board, and the hero. */
+const groupsInPlay = (): SlotGroup[] => [...activeSeats(), 'board', 'hero'];
 
 const rankNames: Record<string, string> = {
   2: 'Two', 3: 'Three', 4: 'Four', 5: 'Five', 6: 'Six', 7: 'Seven', 8: 'Eight', 9: 'Nine',
@@ -43,7 +51,12 @@ const rankLabel = (card: Card) => (card[0] === 'T' ? '10' : card[0]);
 
 function slotLabel(group: SlotGroup, index: number) {
   if (group === 'board') return 'Board card ' + (index + 1) + ' (' + boardStreets[index] + ')';
-  return (group === 'hero' ? 'Your card ' : 'Opponent card ') + (index + 1);
+  if (group === 'hero') return 'Your card ' + (index + 1);
+  return seatName(group) + ' card ' + (index + 1);
+}
+
+function seatName(group: SlotGroup) {
+  return opponentCount === 1 ? 'Opponent' : 'Opponent ' + group.slice(3);
 }
 
 function describeSlot(group: SlotGroup, index: number, slot: Slot) {
@@ -69,7 +82,7 @@ function renderCardFace(node: HTMLElement, card: Card) {
 }
 
 function renderSlots() {
-  for (const group of groups) {
+  for (const group of groupsInPlay()) {
     const container = element('' + group + '-cards');
     container.replaceChildren(...slots[group].map((slot, index) => {
       const button = document.createElement('button');
@@ -102,7 +115,7 @@ function renderSlots() {
       return button;
     }));
   }
-  const pending = groups.flatMap(group => slots[group]).filter(slot => slot.pending).length;
+  const pending = groupsInPlay().flatMap(group => slots[group]).filter(slot => slot.pending).length;
   element('confirm-bar').hidden = pending === 0;
   element('confirm-text').textContent = pending === 1
     ? 'One card from the photo needs checking. Tap it to correct it, or confirm.'
@@ -119,7 +132,7 @@ let picking: { group: SlotGroup; index: number; opener: HTMLElement | null } | n
 
 function openPicker(group: SlotGroup, index: number) {
   const current = slots[group][index];
-  const used = new Set(groups.flatMap(g => slots[g]
+  const used = new Set(groupsInPlay().flatMap(g => slots[g]
     .filter((slot, i) => slot.card && !(g === group && i === index))
     .map(slot => slot.card)));
   picking = { group, index, opener: document.activeElement as HTMLElement | null };
@@ -184,20 +197,20 @@ function finishPick(value: string) {
 
 function refreshDuplicates() {
   const counts = new Map<Card, number>();
-  for (const slot of groups.flatMap(g => slots[g])) if (slot.card) counts.set(slot.card, (counts.get(slot.card) ?? 0) + 1);
-  for (const slot of groups.flatMap(g => slots[g])) {
+  for (const slot of groupsInPlay().flatMap(g => slots[g])) if (slot.card) counts.set(slot.card, (counts.get(slot.card) ?? 0) + 1);
+  for (const slot of groupsInPlay().flatMap(g => slots[g])) {
     if (slot.pending) slot.duplicate = !!slot.card && (counts.get(slot.card) ?? 0) > 1;
   }
 }
 
 element('confirm-all').addEventListener('click', () => {
-  for (const slot of groups.flatMap(g => slots[g])) {
+  for (const slot of groupsInPlay().flatMap(g => slots[g])) {
     if (slot.pending && slot.duplicate) {
       status.textContent = 'Two slots show the same card. Fix the duplicate before confirming.';
       return;
     }
   }
-  for (const group of groups) {
+  for (const group of groupsInPlay()) {
     slots[group] = slots[group].map(slot => ({ card: slot.card, pending: false }));
   }
   invalidate();
@@ -223,7 +236,10 @@ function invalidate() {
   element('result-empty').hidden = false;
 }
 
-form.addEventListener('input', invalidate);
+form.addEventListener('input', () => {
+  invalidate();
+  updateToCall();
+});
 
 function getNumber(id: string) {
   return element<HTMLInputElement>(id).valueAsNumber;
@@ -233,6 +249,49 @@ function cardsIn(group: SlotGroup): Card[] {
   return slots[group].flatMap(slot => (slot.card ? [slot.card] : []));
 }
 
+/**
+ * Show the amount to call next to the hero, from the biggest opponent bet,
+ * and offer the "pot they can win" field for opponents all-in earlier.
+ */
+function updateToCall() {
+  const bets = activeSeats().map(seat => getNumber(seat + '-bet')).filter(Number.isFinite);
+  const mine = getNumber('committed');
+  const toCall = Math.max(0, ...bets) - (Number.isFinite(mine) ? mine : 0);
+  element('to-call').textContent = toCall > 0 ? 'To call: ' + chips(toCall) : 'Nothing to call';
+  for (const seat of seatGroups) {
+    const earlier = activeSeats().includes(seat) && getNumber(seat + '-stack') === 0 && getNumber(seat + '-bet') === 0;
+    element(seat + '-cap-field').hidden = !earlier;
+    if (!earlier) element<HTMLInputElement>(seat + '-cap').value = '';
+  }
+}
+
+/** Seat 1–3 opponents. Hidden seats are cleared so their cards free up. */
+function setOpponentCount(count: number) {
+  opponentCount = Math.min(3, Math.max(1, count));
+  element<HTMLSelectElement>('players').value = String(opponentCount + 1);
+  seatGroups.forEach((seat, i) => {
+    const seated = i < opponentCount;
+    element('seat-' + seat).hidden = !seated;
+    for (const field of ['stack', 'bet']) element<HTMLInputElement>(seat + '-' + field).required = seated;
+    if (!seated) {
+      slots[seat] = slots[seat].map(() => ({ card: null, pending: false }));
+      element<HTMLInputElement>(seat + '-stack').value = '';
+      element<HTMLInputElement>(seat + '-bet').value = '0';
+    }
+    element(seat + '-name').textContent = seatName(seat);
+  });
+  element('felt').dataset.opponents = String(opponentCount);
+  refreshDuplicates();
+  invalidate();
+  renderSlots();
+  updateToCall();
+}
+
+element('players').addEventListener('change', event => {
+  event.stopPropagation();
+  setOpponentCount(Number(element<HTMLSelectElement>('players').value) - 1);
+});
+
 function snapshot(): Snapshot {
   const board = slots.board;
   let filled = 0;
@@ -241,15 +300,23 @@ function snapshot(): Snapshot {
     throw new Error('Fill the board from the left: three flop cards, then the turn, then the river.');
   }
   if (cardsIn('hero').length !== 2) throw new Error('Pick both of your cards.');
-  if (cardsIn('opponent').length === 1) throw new Error('Pick both opponent cards or leave both empty.');
+  for (const seat of activeSeats()) {
+    if (cardsIn(seat).length === 1) throw new Error('Pick both cards for ' + seatName(seat).toLowerCase() + ' or leave both empty.');
+  }
   return {
-    version: 1, ruleset: 'holdem-nl-hu',
+    version: 2, ruleset: 'holdem-nl',
     purpose: element<HTMLSelectElement>('purpose').value as Snapshot['purpose'],
     hero: cardsIn('hero'),
     board: cardsIn('board'),
-    opponent: cardsIn('opponent'),
-    pot: getNumber('pot'), heroStack: getNumber('hero-stack'), opponentStack: getNumber('opponent-stack'),
-    committed: getNumber('committed'), faced: getNumber('faced'), increment: getNumber('increment'),
+    opponents: activeSeats().map(seat => {
+      const cap = getNumber(seat + '-cap');
+      return {
+        stack: getNumber(seat + '-stack'), committed: getNumber(seat + '-bet'), cards: cardsIn(seat),
+        ...(Number.isFinite(cap) ? { eligiblePot: cap } : {}),
+      };
+    }),
+    pot: getNumber('pot'), heroStack: getNumber('hero-stack'),
+    committed: getNumber('committed'), increment: getNumber('increment'),
   };
 }
 
@@ -259,21 +326,22 @@ function setNumbers(values: Record<string, string>) {
 
 element('load-example').addEventListener('click', () => {
   slots = emptySlots();
-  const example: Record<SlotGroup, Card[]> = { hero: ['As', 'Ks'], board: ['Qs', 'Js', '4d', '2s', '9c'], opponent: [] };
-  for (const group of groups) example[group].forEach((card, i) => { slots[group][i] = { card, pending: false }; });
+  const example: Partial<Record<SlotGroup, Card[]>> = { hero: ['As', 'Ks'], board: ['Qs', 'Js', '4d', '2s', '9c'] };
+  for (const group of allGroups) example[group]?.forEach((card, i) => { slots[group][i] = { card, pending: false }; });
+  setOpponentCount(1);
   setNumbers({
-    purpose: 'simulation', pot: '120', 'hero-stack': '150', 'opponent-stack': '110',
-    committed: '0', faced: '40', increment: '40',
+    purpose: 'simulation', pot: '120', 'hero-stack': '150', 'opp1-stack': '110', 'opp1-bet': '40',
+    committed: '0', increment: '40',
   });
   invalidate();
   renderSlots();
+  updateToCall();
 });
 
 element('reset-table').addEventListener('click', () => {
   slots = emptySlots();
   form.reset();
-  invalidate();
-  renderSlots();
+  setOpponentCount(Number(element<HTMLSelectElement>('players').value) - 1);
 });
 
 const percent = (fraction: number) => (fraction * 100).toFixed(1) + '%';
@@ -325,10 +393,13 @@ function showOutlook(outlook: Outlook) {
   const boards = outlook.method === 'exact'
     ? 'Hand chances are exact over all ' + outlook.runouts.toLocaleString() + ' possible boards'
     : 'Hand chances are estimated from ' + outlook.runouts.toLocaleString() + ' random boards';
+  const many = outlook.opponent.players > 1;
   const matchups = (outlook.opponent.method === 'exact' ? '; matchups are exact over ' : '; matchups are estimated from ')
-    + outlook.opponent.matchups.toLocaleString() + (outlook.opponent.model === 'known' ? ' boards against the known opponent hand' : ' board and opponent-hand pairs');
-  add(results, 'p', boards + matchups + '. Every unseen card counts as possible, and an unknown opponent holds a random hand. '
-    + 'These are showdown odds if both players reach the river; they ignore betting, folds, and how the opponent plays.').className = 'fine-print';
+    + outlook.opponent.matchups.toLocaleString()
+    + (outlook.opponent.model === 'known' ? ' boards against the known opponent ' + (many ? 'hands' : 'hand') : many ? ' deals' : ' board and opponent-hand pairs');
+  add(results, 'p', boards + matchups + '. Every unseen card counts as possible, and unknown opponents hold random hands. '
+    + (many ? 'With several opponents you must beat the strongest of them. ' : '')
+    + 'These are showdown odds if everyone reaches the river; they ignore betting, folds, and how opponents play.').className = 'fine-print';
 }
 
 const pct = (fraction: number) => (fraction > 0 && fraction < 0.0005 ? '<0.1%' : percent(fraction));
@@ -413,7 +484,7 @@ function outlookRow(outlook: Outlook, row: OutlookRow, hasNext: boolean) {
     body.append(bar);
     add(body, 'p', 'You win ' + pct(matchup.win) + ' · tie ' + pct(matchup.tie) + ' · lose ' + pct(matchup.loss));
     if (matchup.beatenBy.length) {
-      add(body, 'p', 'The opponent beats it with:').className = 'detail-lead';
+      add(body, 'p', (outlook.opponent.players > 1 ? 'The strongest opponent beats it with:' : 'The opponent beats it with:')).className = 'detail-lead';
       const beaten = document.createElement('ul');
       beaten.className = 'beaten';
       for (const hand of matchup.beatenBy) {
@@ -435,19 +506,24 @@ function opponentPanel(outlook: Outlook) {
   const details = document.createElement('details');
   details.className = 'outlook-row opponent-odds';
   const summary = document.createElement('summary');
-  add(summary, 'span', opponent.model === 'known' ? 'Opponent’s hands (known cards)' : 'Opponent’s possible hands').className = 'cell name';
+  const many = opponent.players > 1;
+  add(summary, 'span', many
+    ? 'Strongest opponent hand' + (opponent.model === 'known' ? ' (known cards)' : '')
+    : opponent.model === 'known' ? 'Opponent’s hands (known cards)' : 'Opponent’s possible hands').className = 'cell name';
   const odds = add(summary, 'span', 'Wins ' + pct(opponent.beatsYou));
   odds.className = 'cell river';
   details.append(summary);
 
   const body = document.createElement('div');
   body.className = 'detail';
-  add(body, 'p', 'Opponent showdown equity ' + percent(opponent.equity) + ' · beats you ' + pct(opponent.beatsYou)
-    + ' of the time. How often they finish with each hand, and how often it beats yours:');
+  add(body, 'p', (many ? 'Opponents’ combined showdown equity ' : 'Opponent showdown equity ') + percent(opponent.equity)
+    + ' · ' + (many ? 'someone beats you ' : 'beats you ') + pct(opponent.beatsYou) + ' of the time. '
+    + (many ? 'How often the strongest opponent hand is each type, and how often it beats yours:'
+      : 'How often they finish with each hand, and how often it beats yours:'));
   const table = document.createElement('table');
   table.className = 'opponent-table';
   const head = table.createTHead().insertRow();
-  for (const label of ['Their hand', 'They make it', 'And beat you']) {
+  for (const label of [many ? 'Best hand' : 'Their hand', 'They make it', 'And beat you']) {
     const cell = document.createElement('th');
     cell.scope = 'col';
     cell.textContent = label;
@@ -540,9 +616,11 @@ function renderSizing(body: HTMLElement, advice: BetAdvice) {
   let reason = 'Expected ' + signed(top.ev) + ' chips from here';
   if (baseline && top !== baseline) reason += ', versus ' + signed(baseline.ev) + ' for ' + describeOption(baseline).toLowerCase();
   if (top.kind === 'bet' || top.kind === 'raise') {
-    reason += '. They fold ' + wholePct(top.foldChance) + '; when they call you have ' + wholePct(top.equityWhenCalled) + ' equity.';
+    reason += advice.players > 1
+      ? '. Everyone folds ' + wholePct(top.foldChance) + '; when anyone calls you have ' + wholePct(top.equityWhenCalled) + ' equity.'
+      : '. They fold ' + wholePct(top.foldChance) + '; when they call you have ' + wholePct(top.equityWhenCalled) + ' equity.';
   } else {
-    reason += top.kind === 'check' ? '. No bet size beats checking against this opponent.' : '.';
+    reason += top.kind === 'check' ? '. No bet size beats checking against ' + (advice.players > 1 ? 'these opponents.' : 'this opponent.') : '.';
   }
   add(headline, 'p', reason);
   body.append(headline);
@@ -580,13 +658,17 @@ function renderSizing(body: HTMLElement, advice: BetAdvice) {
   body.append(table);
 
   const notes = [
-    'Expected chips you gain from this decision on, counting what is already in the pot. The opponent ranks their possible hands by how strong they look on this board, calls with the strongest, and never re-raises.',
+    'Expected chips you gain from this decision on, counting what is already in the pot. '
+      + (advice.players > 1
+        ? 'Each opponent ranks their possible hands by how strong they look on this board, calls with the strongest, and never re-raises; chips are paid out through main and side pots. Estimated from sampled deals.'
+        : 'The opponent ranks their possible hands by how strong they look on this board, calls with the strongest, and never re-raises.'),
     styleLabels[opponentStyle] + ': ' + (opponentStyle === 'balanced'
-      ? 'folds just often enough that a pure bluff breaks even.'
+      ? (advice.players > 1 ? 'the table folds together just often enough that a pure bluff breaks even.' : 'folds just often enough that a pure bluff breaks even.')
       : opponentStyle === 'loose' ? 'folds half as often as a balanced player.' : 'folds 1.6 times as often as a balanced player.'),
   ];
   if (advice.streetsLeft > 0) notes.push('Later streets are treated as checked down, which tends to favor bigger bets now. Treat sizes before the river as rough.');
-  if (advice.opponent === 'known') notes.push('With known opponent cards (hindsight), that exact hand calls or folds by where it ranks in their range.');
+  if (advice.opponent === 'known') notes.push('With known opponent cards (hindsight), each known hand calls or folds by where it ranks in the range.');
+  if (advice.players > 1) notes.push('Players who still had to act on an earlier bet keep their current chips in and do not add more unless you bet.');
   add(body, 'p', notes.join(' ')).className = 'fine-print';
 }
 
@@ -596,7 +678,12 @@ function show(result: ReturnType<typeof analyze>, scenario: Snapshot) {
   add(results, 'p', 'SHOWDOWN EQUITY').className = 'eyebrow';
   add(results, 'p', percent(equity.share)).className = 'equity';
   add(results, 'p', 'Win ' + percent(equity.win) + ' · Tie ' + percent(equity.tie) + ' · Loss ' + percent(equity.loss));
-  const model = scenario.opponent.length ? 'Known opponent cards (hindsight if reconstructed)' : 'Uniform random opponent hand';
+  const known = scenario.opponents.filter(o => o.cards.length).length;
+  const count = scenario.opponents.length;
+  const model = count === 1
+    ? (known ? 'Known opponent cards (hindsight if reconstructed)' : 'Uniform random opponent hand')
+    : 'Against ' + count + ' opponents · ' + (known === count ? 'all hands known (hindsight if reconstructed)'
+      : known ? known + ' known, ' + (count - known) + ' random' : 'random hands');
   add(results, 'p', model + ' · ' + equity.trials.toLocaleString() + (equity.method === 'exact' ? ' exact outcomes' : ' simulated draws'));
   if (equity.method === 'sampled') {
     add(results, 'p', '95% sampling bound: ' + equity.interval.map(percent).join(' to '));
@@ -623,7 +710,7 @@ function show(result: ReturnType<typeof analyze>, scenario: Snapshot) {
 form.addEventListener('submit', event => {
   event.preventDefault();
   invalidate();
-  if (groups.some(group => slots[group].some(slot => slot.pending))) {
+  if (groupsInPlay().some(group => slots[group].some(slot => slot.pending))) {
     status.textContent = 'Check the cards read from the photo before analysis. Tap each flagged card or confirm them all.';
     return;
   }
@@ -748,8 +835,11 @@ async function prepareUpload(image: Blob): Promise<Blob> {
 
 function applyRecognition(recognition: Extract<Recognition, { kind: 'observations' }>) {
   slots = emptySlots();
+  // Seat as many opponents as the photo shows; never fewer than one.
+  if (recognition.opponentSeats > 0) setOpponentCount(recognition.opponentSeats);
   for (const observation of recognition.slots) {
-    slots[observation.group][observation.index] = {
+    const group: SlotGroup = observation.group === 'opponent' ? seatGroups[(observation.seat ?? 1) - 1] : observation.group;
+    slots[group][observation.index] = {
       card: observation.candidates[0]?.card ?? null,
       pending: true,
       confidence: observation.confidence,
@@ -807,7 +897,7 @@ camera.addEventListener('change', () => void choosePhoto(camera));
 element('clear-photo').addEventListener('click', clearPhoto);
 window.addEventListener('pagehide', clearPhoto);
 
-renderSlots();
+setOpponentCount(Number(element<HTMLSelectElement>('players').value) - 1);
 
 if (window.isSecureContext && 'serviceWorker' in navigator) {
   // When a newer build takes control, reload once so the page runs it. Skip the

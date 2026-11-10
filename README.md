@@ -1,6 +1,6 @@
 # Poker Study
 
-A local study app for simulated and completed Texas Hold’em hands. The starter supports heads-up no-limit decision snapshots on desktop and phone. Its recommendation compares call and fold when the call ends betting, using the opponent model displayed in the result.
+A local study app for simulated and completed Texas Hold’em hands. It supports no-limit decision snapshots for two to four players (heads-up by default) on desktop and phone, with main and side pots. Its recommendation compares call and fold when the call ends betting, using the opponent model displayed in the result.
 
 ## Run locally
 
@@ -12,7 +12,7 @@ npm run build
 npm start
 ```
 
-Open http://127.0.0.1:4173, choose **Load example**, and select **Analyze hand**. The example has two spades in hand and three on the river board. To set up your own hand, tap any card slot on the table to pick a card, and enter the chips on the table.
+Open http://127.0.0.1:4173, choose **Load example**, and select **Analyze hand**. The example has two spades in hand and three on the river board. To set up your own hand, choose **Players in the hand** (2, 3, or 4), tap any card slot on the table to pick a card, and enter each player's stack and bet this street.
 
 ### Photo scan with Claude
 

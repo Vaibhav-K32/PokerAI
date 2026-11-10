@@ -195,3 +195,20 @@ footer { padding-block: 1.25rem 2rem; color: #425d55; font-size: .88rem; }
 .sizing-table th[scope=row], .sizing-table thead th:first-child { text-align: left; }
 .sizing-table thead th { font-size: .7rem; letter-spacing: .05em; text-transform: uppercase; color: #4a645d; }
 .sizing-table tr.best { background: #f1f7ea; font-weight: 700; }
+
+/* Multiway seats ---------------------------------------------------------- */
+.opponent-seats { display: flex; flex-wrap: wrap; justify-content: center; gap: clamp(.6rem, 3vw, 2rem); width: 100%; }
+.felt[data-opponents="3"] .opponent-seats { gap: clamp(.3rem, 2vw, 1.2rem); }
+.felt[data-opponents="3"] { --card-w: clamp(2.4rem, 7vw, 3.4rem); }
+.felt[data-opponents="3"] .chip-field input { width: 5.5rem; }
+.seat-opponent .chip-field.bet input { width: 5.5rem; }
+.hero-bet { display: grid; justify-items: center; gap: .2rem; }
+.to-call { margin: 0; font-size: .78rem; font-weight: 700; color: #f2e3a6; }
+.controls { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 34rem) {
+  .controls { grid-template-columns: 1fr; }
+  .felt[data-opponents="3"] .seat-opponent .chip-field input { width: 4.6rem; }
+}
+.chip-field.cap { max-width: 9rem; font-size: .68rem; color: #f2e3a6; }
+.chip-field.cap input { width: 6.5rem; border-color: #f2e3a6; }
+.chip-field.cap input::placeholder { color: #b9d2c3; font-weight: 500; }

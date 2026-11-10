@@ -23,9 +23,10 @@ const slot = {
 export const RESULT_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['opponent', 'board', 'hero', 'issues'],
+  required: ['opponents', 'board', 'hero', 'issues'],
   properties: {
-    opponent: { type: 'array', items: slot },
+    // One entry per opponent, left to right; an empty list for face-down cards.
+    opponents: { type: 'array', items: { type: 'array', items: slot } },
     board: { type: 'array', items: slot },
     hero: { type: 'array', items: slot },
     issues: { type: 'array', items: { type: 'string' } },
@@ -34,14 +35,14 @@ export const RESULT_SCHEMA = {
 
 const SYSTEM = `You transcribe physical playing cards from a single photo for a poker study app. The user reviews and confirms every card you report, so accuracy matters more than completeness.
 
-The user lays the cards out face-up in three rows:
-- opponent: the two hole cards in the row farthest from the camera (top of the image)
+The user lays the cards out in three rows:
+- opponents: the row farthest from the camera (top of the image) holds one to three opponents' hole cards, two cards per opponent, as separate pairs from left to right. Return one entry per opponent pair in that left-to-right order. If an opponent's pair is face-down, return an empty list for that opponent so the seats stay in order.
 - board: the community cards in the middle row, read left to right (up to five)
 - hero: the user's two hole cards in the row nearest the camera (bottom of the image)
 
 Card codes are a rank from 2 3 4 5 6 7 8 9 T J Q K A followed by a suit letter: c clubs, d diamonds, h hearts, s spades. A ten is T.
 
-Report only cards that are face-up and visible. Leave out face-down cards, card backs, and empty positions; do not guess hidden cards. When a face-up card is visible but you cannot read both rank and suit with certainty (glare, blur, occlusion, angle), report it as "unknown". Use "high" confidence only when both the rank and the suit indices are clearly legible. Ignore chips, hands, and other objects; never estimate bets or positions. If the layout does not match the three rows, assign cards as best you can and describe the problem in issues. Put short, plain-language notes about glare, blur, cropping, layout, or duplicate-looking cards in issues, or leave it empty.`;
+Report only cards that are face-up and visible. Leave out face-down cards, card backs, and empty positions; do not guess hidden cards. When a face-up card is visible but you cannot read both rank and suit with certainty (glare, blur, occlusion, angle), report it as "unknown". Use "high" confidence only when both the rank and the suit indices are clearly legible. Ignore chips, hands, and other objects; never estimate bets or positions. Never report more than three opponents or more than two cards for one opponent. If the layout does not match the three rows, assign cards as best you can and describe the problem in issues. Put short, plain-language notes about glare, blur, cropping, layout, or duplicate-looking cards in issues, or leave it empty.`;
 
 function send(response, status, body) {
   response.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' })
