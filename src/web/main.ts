@@ -1,6 +1,6 @@
 import { standardDeck } from '../core/cards.js';
 import type { analyze } from '../core/analyze.js';
-import type { Action, Card, Outlook, Snapshot } from '../core/types.js';
+import type { Action, Card, Outlook, OutlookRow, Snapshot } from '../core/types.js';
 import { cloudRecognizer, type Confidence, type Recognition, type SlotGroup } from '../vision/recognizer.js';
 
 function element<T extends HTMLElement>(id: string): T {
@@ -306,45 +306,164 @@ function showOutlook(outlook: Outlook) {
     add(results, 'p', 'Chance to beat your ' + outlook.current.name.toLowerCase() + ' with '
       + toCome + ': ' + percent(outlook.improveByRiver));
   }
+  showSuggestion(outlook);
+
   const hasNext = outlook.rows.some(row => row.nextCard);
+  const list = document.createElement('div');
+  list.className = 'outlook' + (hasNext ? '' : ' no-next');
+  const head = document.createElement('div');
+  head.className = 'outlook-head';
+  head.setAttribute('aria-hidden', 'true');
+  for (const label of ['Hand', ...(hasNext ? ['Next card'] : []), 'By the river']) add(head, 'span', label);
+  list.append(head);
+  for (const row of outlook.rows) list.append(outlookRow(outlook, row, hasNext));
+  results.append(list);
+  results.append(opponentPanel(outlook));
+
+  const boards = outlook.method === 'exact'
+    ? 'Hand chances are exact over all ' + outlook.runouts.toLocaleString() + ' possible boards'
+    : 'Hand chances are estimated from ' + outlook.runouts.toLocaleString() + ' random boards';
+  const matchups = (outlook.opponent.method === 'exact' ? '; matchups are exact over ' : '; matchups are estimated from ')
+    + outlook.opponent.matchups.toLocaleString() + (outlook.opponent.model === 'known' ? ' boards against the known opponent hand' : ' board and opponent-hand pairs');
+  add(results, 'p', boards + matchups + '. Every unseen card counts as possible, and an unknown opponent holds a random hand. '
+    + 'These are showdown odds if both players reach the river; they ignore betting, folds, and how the opponent plays.').className = 'fine-print';
+}
+
+const pct = (fraction: number) => (fraction > 0 && fraction < 0.0005 ? '<0.1%' : percent(fraction));
+const wholePct = (fraction: number) => Math.round(fraction * 100) + '%';
+
+function showSuggestion(outlook: Outlook) {
+  const { playFor, caution, holding } = outlook.suggestion;
+  if (!playFor.length && !caution.length && !holding) return;
+  const box = document.createElement('div');
+  box.className = 'suggestion';
+  const lines: [string, string][] = [];
+  if (holding) {
+    lines.push(['Already good', 'Your ' + holding.name.toLowerCase() + ' wins ' + wholePct(holding.winWhenMade)
+      + ' of showdowns when it stays your hand (' + wholePct(holding.byRiver) + ' of boards).']);
+  }
+  for (const hand of playFor) {
+    lines.push(['Play for', hand.name + ': you make it ' + pct(hand.byRiver) + ' of the time and win '
+      + wholePct(hand.winWhenMade) + ' when you do. It carries ' + wholePct(hand.equityShare / Math.max(outlook.yourEquity, 1e-9))
+      + ' of your equity.']);
+  }
+  for (const hand of caution) {
+    lines.push(['Careful', 'Finishing with ' + hand.name.toLowerCase() + ' (' + pct(hand.byRiver)
+      + ' of boards) wins only ' + wholePct(hand.winWhenMade) + ' of showdowns.']);
+  }
+  for (const [tag, text] of lines) {
+    const line = document.createElement('p');
+    add(line, 'strong', tag).className = 'tag tag-' + tag.split(' ')[0].toLowerCase();
+    line.append(' ' + text);
+    box.append(line);
+  }
+  results.append(box);
+}
+
+function outlookRow(outlook: Outlook, row: OutlookRow, hasNext: boolean) {
+  const isNow = outlook.current?.category === row.category;
+  const details = document.createElement('details');
+  details.className = 'outlook-row' + (isNow ? ' current' : '');
+  const summary = document.createElement('summary');
+
+  const name = add(summary, 'span', row.name);
+  name.className = 'cell name';
+  if (isNow) add(name, 'small', 'now');
+
+  const spoken = [row.name + (isNow ? ', your current hand' : '')];
+  if (hasNext) {
+    const next = document.createElement('span');
+    next.className = 'cell next';
+    const outs = row.nextCard?.outs ?? [];
+    if (outs.length) {
+      const count = outs.length + (outs.length === 1 ? ' out · ' : ' outs · ') + percent(row.nextCard!.chance);
+      next.append(count);
+      add(next, 'span', outs.map(shortCard).join(' ')).className = 'outs';
+      spoken.push('next card ' + count.replace(' · ', ', ') + ': ' + outs.map(cardName).join(', '));
+    } else {
+      next.append('—');
+      spoken.push('no next-card outs');
+    }
+    summary.append(next);
+  }
+  add(summary, 'span', pct(row.byRiver)).className = 'cell river';
+  spoken.push(pct(row.byRiver) + ' by the river');
+  summary.setAttribute('aria-label', spoken.join('; '));
+  details.append(summary);
+
+  const body = document.createElement('div');
+  body.className = 'detail';
+  const matchup = row.matchup;
+  if (!matchup) {
+    add(body, 'p', 'You do not finish with this hand on any of these boards.');
+  } else {
+    const article = isNow ? 'your ' : ['Straight', 'Flush', 'Full house', 'Straight flush'].includes(row.name) ? 'a ' : '';
+    add(body, 'p', 'When you finish with ' + article + row.name.toLowerCase() + ':').className = 'detail-lead';
+    const bar = document.createElement('div');
+    bar.className = 'meter';
+    bar.setAttribute('aria-hidden', 'true');
+    for (const [part, value] of [['win', matchup.win], ['tie', matchup.tie], ['loss', matchup.loss]] as const) {
+      const segment = document.createElement('span');
+      segment.className = part;
+      segment.style.width = (value * 100).toFixed(2) + '%';
+      bar.append(segment);
+    }
+    body.append(bar);
+    add(body, 'p', 'You win ' + pct(matchup.win) + ' · tie ' + pct(matchup.tie) + ' · lose ' + pct(matchup.loss));
+    if (matchup.beatenBy.length) {
+      add(body, 'p', 'The opponent beats it with:').className = 'detail-lead';
+      const beaten = document.createElement('ul');
+      beaten.className = 'beaten';
+      for (const hand of matchup.beatenBy) {
+        const item = add(beaten, 'li', hand.name);
+        add(item, 'span', pct(hand.chance));
+      }
+      body.append(beaten);
+    } else {
+      add(body, 'p', 'No opponent hand beats it on these boards.');
+    }
+    add(body, 'p', 'Worth ' + percent(row.equityShare) + ' of the pot in showdown equity.').className = 'fine-print';
+  }
+  details.append(body);
+  return details;
+}
+
+function opponentPanel(outlook: Outlook) {
+  const { opponent } = outlook;
+  const details = document.createElement('details');
+  details.className = 'outlook-row opponent-odds';
+  const summary = document.createElement('summary');
+  add(summary, 'span', opponent.model === 'known' ? 'Opponent’s hands (known cards)' : 'Opponent’s possible hands').className = 'cell name';
+  const odds = add(summary, 'span', 'Wins ' + pct(opponent.beatsYou));
+  odds.className = 'cell river';
+  details.append(summary);
+
+  const body = document.createElement('div');
+  body.className = 'detail';
+  add(body, 'p', 'Opponent showdown equity ' + percent(opponent.equity) + ' · beats you ' + pct(opponent.beatsYou)
+    + ' of the time. How often they finish with each hand, and how often it beats yours:');
   const table = document.createElement('table');
-  table.className = 'outlook';
+  table.className = 'opponent-table';
   const head = table.createTHead().insertRow();
-  for (const label of ['Hand', ...(hasNext ? ['Next card'] : []), 'By the river']) {
+  for (const label of ['Their hand', 'They make it', 'And beat you']) {
     const cell = document.createElement('th');
     cell.scope = 'col';
     cell.textContent = label;
     head.append(cell);
   }
-  const body = table.createTBody();
-  for (const row of outlook.rows) {
-    const line = body.insertRow();
-    if (outlook.current?.category === row.category) line.className = 'current';
+  const rows = table.createTBody();
+  for (const row of opponent.rows) {
+    const line = rows.insertRow();
     const name = document.createElement('th');
     name.scope = 'row';
-    name.textContent = row.name + (outlook.current?.category === row.category ? ' (now)' : '');
+    name.textContent = row.name;
     line.append(name);
-    if (hasNext) {
-      const next = line.insertCell();
-      const outs = row.nextCard?.outs ?? [];
-      if (outs.length) {
-        next.textContent = outs.length + (outs.length === 1 ? ' out · ' : ' outs · ') + percent(row.nextCard!.chance);
-        const cards = document.createElement('span');
-        cards.className = 'outs';
-        cards.textContent = outs.map(shortCard).join(' ');
-        cards.setAttribute('aria-label', 'Outs: ' + outs.map(cardName).join(', '));
-        next.append(cards);
-      } else {
-        next.textContent = '—';
-      }
-    }
-    line.insertCell().textContent = row.byRiver > 0 && row.byRiver < 0.0005 ? '<0.1%' : percent(row.byRiver);
+    line.insertCell().textContent = pct(row.chance);
+    line.insertCell().textContent = pct(row.beatsYou);
   }
-  results.append(table);
-  add(results, 'p', (outlook.method === 'exact'
-    ? 'Exact over all ' + outlook.runouts.toLocaleString() + ' possible boards'
-    : 'Estimated from ' + outlook.runouts.toLocaleString() + ' random boards')
-    + '. Every unseen card counts as possible, including any the opponent may hold. “By the river” is your final hand type; making a hand does not guarantee winning, so read it with the equity above.').className = 'fine-print';
+  body.append(table);
+  details.append(body);
+  return details;
 }
 
 function show(result: ReturnType<typeof analyze>, scenario: Snapshot) {

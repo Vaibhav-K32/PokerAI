@@ -28,14 +28,19 @@ export function calculateEquity(s: Snapshot, rules: Ruleset): Equity {
   let wins = 0;
   let ties = 0;
   let trials = 0;
-  const finalHero = unknownBoard === 0 ? rules.rank(s.hero, s.board) : null;
+  // Prefer the ruleset's fast score; it orders hands exactly like `rank`.
+  const compare = rules.score
+    ? (board: readonly Card[], hole: readonly Card[]) =>
+      rules.score!(s.hero, board) - rules.score!([...s.opponent, ...hole], board)
+    : (board: readonly Card[], hole: readonly Card[]) => {
+      const hero = rules.rank(s.hero, board);
+      const opponent = rules.rank([...s.opponent, ...hole], board);
+      if (!hero || !opponent) throw new Error('Ruleset did not produce a showdown rank.');
+      return compareRank(hero.value, opponent.value);
+    };
 
   function record(hole: readonly Card[], runout: readonly Card[]) {
-    const board = [...s.board, ...runout];
-    const hero = finalHero ?? rules.rank(s.hero, board);
-    const opponent = rules.rank([...s.opponent, ...hole], board);
-    if (!hero || !opponent) throw new Error('Ruleset did not produce a showdown rank.');
-    const order = compareRank(hero.value, opponent.value);
+    const order = compare([...s.board, ...runout], hole);
     if (order > 0) wins++;
     if (order === 0) ties++;
     trials++;

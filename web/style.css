@@ -123,14 +123,49 @@ dialog .actions { margin-top: 1rem; justify-content: flex-end; }
 .results .eyebrow { margin-top: 1.4rem; color: #406b55; }
 .equity { font: 500 3.5rem/1 Georgia, serif; color: #1b634b; }
 .results ul { padding-left: 1.2rem; line-height: 1.5; }
-.outlook { width: 100%; border-collapse: collapse; font-size: .88rem; margin-top: .4rem; }
-.outlook th, .outlook td { padding: .4rem .35rem; border-bottom: 1px solid #e3e9e1; text-align: left; vertical-align: top; }
-.outlook thead th { font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; color: #4a645d; }
-.outlook td:last-child, .outlook thead th:last-child { text-align: right; font-variant-numeric: tabular-nums; }
-.outlook tbody th { font-weight: 650; }
-.outlook tr.current { background: #f1f7ea; }
-.outlook .outs { display: block; margin-top: .15rem; color: #4a645d; font-size: .8rem; letter-spacing: .02em; overflow-wrap: anywhere; }
 .fine-print { font-size: .8rem; color: #4a645d; }
+
+.suggestion { margin: .6rem 0 .8rem; padding: .6rem .8rem; border-radius: .7rem; background: #f1f7ea; border: 1px solid #d5e3ce; font-size: .88rem; }
+.suggestion p { margin: .3rem 0; }
+.tag { display: inline-block; margin-right: .2rem; padding: .05rem .4rem; border-radius: .3rem; font-size: .7rem; letter-spacing: .05em; text-transform: uppercase; }
+.tag-play, .tag-already { background: #1b634b; color: #fff; }
+.tag-careful { background: #f2c94c; color: #2b2205; }
+
+.outlook { font-size: .88rem; margin-top: .4rem; }
+.outlook-head, .outlook-row > summary {
+  display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.3fr) minmax(4.5rem, .6fr) 1rem;
+  gap: .5rem; align-items: start; padding: .5rem .35rem;
+}
+.outlook.no-next .outlook-head, .outlook.no-next .outlook-row > summary { grid-template-columns: minmax(0, 1fr) minmax(4.5rem, auto) 1rem; }
+.outlook-head { font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #4a645d; border-bottom: 1px solid #d7e0d6; }
+.outlook-head span:last-child { grid-column: -3; text-align: right; }
+.outlook-row { border-bottom: 1px solid #e3e9e1; }
+.outlook-row > summary { cursor: pointer; list-style: none; min-height: 2.75rem; }
+.outlook-row > summary::-webkit-details-marker { display: none; }
+.outlook-row > summary::after { content: '▸'; color: #406b55; transition: transform .15s; justify-self: end; }
+.outlook-row[open] > summary::after { transform: rotate(90deg); }
+.outlook-row > summary:hover { background: #f6faf2; }
+.outlook-row.current > summary { background: #f1f7ea; }
+.cell.name { font-weight: 650; }
+.cell.name small { margin-left: .35rem; padding: 0 .3rem; border-radius: .25rem; background: #1b634b; color: #fff; font-size: .65rem; font-weight: 700; text-transform: uppercase; }
+.cell.river { text-align: right; font-variant-numeric: tabular-nums; font-weight: 650; }
+.outs { display: block; margin-top: .15rem; color: #4a645d; font-size: .8rem; letter-spacing: .02em; overflow-wrap: anywhere; }
+.detail { padding: .2rem .6rem .8rem; margin: 0 .35rem .5rem; border-left: 3px solid #bce78e; }
+.detail p { margin: .35rem 0; }
+.detail-lead { font-weight: 650; }
+.meter { display: flex; height: .55rem; border-radius: 1rem; overflow: hidden; background: #e3e9e1; margin: .3rem 0; }
+.meter .win { background: #1b634b; }
+.meter .tie { background: #a7bbb0; }
+.meter .loss { background: #c0392b; }
+.beaten { list-style: none; padding: 0; margin: .2rem 0; }
+.beaten li { display: flex; justify-content: space-between; gap: 1rem; padding: .2rem 0; border-bottom: 1px dashed #e3e9e1; }
+.beaten li span { font-variant-numeric: tabular-nums; color: #8a2a1f; }
+.opponent-odds { margin-top: .6rem; border-top: 1px solid #d7e0d6; }
+.opponent-odds > summary { grid-template-columns: minmax(0, 1fr) auto 1rem; }
+.opponent-table { width: 100%; border-collapse: collapse; margin-top: .3rem; }
+.opponent-table th, .opponent-table td { padding: .3rem .25rem; border-bottom: 1px solid #e3e9e1; text-align: left; }
+.opponent-table thead th { font-size: .7rem; letter-spacing: .05em; text-transform: uppercase; color: #4a645d; }
+.opponent-table td { text-align: right; font-variant-numeric: tabular-nums; }
 footer { padding-block: 1.25rem 2rem; color: #425d55; font-size: .88rem; }
 
 @media (max-width: 60rem) {

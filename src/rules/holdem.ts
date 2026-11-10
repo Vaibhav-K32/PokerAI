@@ -37,6 +37,78 @@ function rank(hole: readonly Card[], board: readonly Card[]): HandRank | null {
   return best;
 }
 
+const rankIndex = new Map([...ranks].map((rank, i) => [rank, i + 2]));
+const suitIndex = new Map([...'cdhs'].map((suit, i) => [suit, i]));
+
+/** Highest straight in a rank bitmask (bit r for rank r, ace also as 1), or 0. */
+function straightHigh(mask: number): number {
+  const m = mask | ((mask >> 14) & 1) << 1;
+  for (let high = 14; high >= 5; high--) {
+    const run = 0b11111 << (high - 4);
+    if ((m & run) === run) return high;
+  }
+  return 0;
+}
+
+function topRanks(mask: number, count: number, exclude = 0): number[] {
+  const out: number[] = [];
+  for (let r = 14; r >= 2 && out.length < count; r--) if (mask & (1 << r) && !(exclude & (1 << r))) out.push(r);
+  return out;
+}
+
+/**
+ * Fast best-hand score for 5 to 7 cards. Larger is stronger, equal means a
+ * split, and the category is `Math.floor(score / 16 ** 5)`. It orders hands
+ * exactly like `rank`, without building every five-card combination.
+ */
+function score(cards: readonly Card[]): number {
+  const counts = new Array<number>(15).fill(0);
+  const suits = [0, 0, 0, 0];
+  const suitCounts = [0, 0, 0, 0];
+  let mask = 0;
+  for (const card of cards) {
+    const r = rankIndex.get(card[0])!;
+    const s = suitIndex.get(card[1])!;
+    counts[r]++;
+    suits[s] |= 1 << r;
+    suitCounts[s]++;
+    mask |= 1 << r;
+  }
+  const encode = (category: number, values: number[]) => {
+    let value = category;
+    for (let i = 0; i < 5; i++) value = value * 16 + (values[i] ?? 0);
+    return value;
+  };
+
+  const flushSuit = suitCounts.findIndex(n => n >= 5);
+  if (flushSuit >= 0) {
+    const high = straightHigh(suits[flushSuit]);
+    if (high) return encode(8, [high]);
+  }
+  let quad = 0;
+  const trips: number[] = [];
+  const pairs: number[] = [];
+  for (let r = 14; r >= 2; r--) {
+    if (counts[r] === 4) quad = r;
+    else if (counts[r] === 3) trips.push(r);
+    else if (counts[r] === 2) pairs.push(r);
+  }
+  if (quad) return encode(7, [quad, topRanks(mask, 1, 1 << quad)[0]]);
+  if (trips.length && (trips.length > 1 || pairs.length)) {
+    return encode(6, [trips[0], Math.max(trips[1] ?? 0, pairs[0] ?? 0)]);
+  }
+  if (flushSuit >= 0) return encode(5, topRanks(suits[flushSuit], 5));
+  const high = straightHigh(mask);
+  if (high) return encode(4, [high]);
+  if (trips.length) return encode(3, [trips[0], ...topRanks(mask, 2, 1 << trips[0])]);
+  if (pairs.length >= 2) {
+    const used = (1 << pairs[0]) | (1 << pairs[1]);
+    return encode(2, [pairs[0], pairs[1], topRanks(mask, 1, used)[0]]);
+  }
+  if (pairs.length) return encode(1, [pairs[0], ...topRanks(mask, 3, 1 << pairs[0])]);
+  return encode(0, topRanks(mask, 5));
+}
+
 function validate(s: Snapshot): void {
   if (s.version !== 1 || s.ruleset !== holdem.id) throw new Error('Unsupported scenario version or ruleset.');
   if (s.purpose !== 'simulation' && s.purpose !== 'completed') throw new Error('Choose a study context.');
@@ -98,6 +170,6 @@ function study(s: Snapshot, e: Equity): StudyNote {
 }
 
 export const holdem: Ruleset = {
-  id: 'holdem-nl-hu', deck: standardDeck, holeCount: 2, showdownBoardCount: 5,
-  validate, rank, legalActions, study,
+  id: 'holdem-nl-hu', deck: standardDeck, holeCount: 2, showdownBoardCount: 5, categories,
+  validate, rank, score: (hole, board) => score([...hole, ...board]), legalActions, study,
 };

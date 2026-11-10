@@ -46,6 +46,48 @@ export interface OutlookRow {
   improves: boolean;
   /** Unseen cards that make exactly this category on the next card. Absent preflop. */
   nextCard?: { outs: readonly Card[]; chance: number };
+  /** Showdown result against the opponent when the hero finishes with this category. */
+  matchup?: Matchup;
+  /** byRiver × (win + tie / 2): this hand's part of the hero's showdown equity. */
+  equityShare: number;
+}
+
+export interface Matchup {
+  /** Conditional on the hero finishing with the row's category. */
+  win: number;
+  tie: number;
+  loss: number;
+  /** Opponent hands that win, as a share of the matchups for this row. */
+  beatenBy: readonly { name: string; chance: number }[];
+}
+
+export interface OpponentOutlook {
+  model: 'known' | 'random';
+  method: 'exact' | 'sampled';
+  matchups: number;
+  /** Opponent showdown equity, including half of ties. */
+  equity: number;
+  /** Chance the opponent finishes ahead of the hero. */
+  beatsYou: number;
+  /** Opponent final categories: how often they make it, and make it and win. */
+  rows: readonly { category: number; name: string; chance: number; beatsYou: number }[];
+}
+
+export interface SuggestedHand {
+  name: string;
+  byRiver: number;
+  /** Win plus half of ties when the hero finishes with this hand. */
+  winWhenMade: number;
+}
+
+export interface Suggestion {
+  /** Improving hands that carry the most showdown equity, strongest share first. */
+  playFor: readonly (SuggestedHand & { equityShare: number })[];
+  /** Hands made at least 10% of the time that win less than half the time. */
+  caution: readonly SuggestedHand[];
+  /** The current hand, when it is already likely to hold up. */
+  holding: SuggestedHand | null;
+  yourEquity: number;
 }
 
 export interface Outlook {
@@ -58,6 +100,10 @@ export interface Outlook {
   /** Chance of finishing with a better category than now, or null preflop. */
   improveByRiver: number | null;
   rows: readonly OutlookRow[];
+  opponent: OpponentOutlook;
+  /** Hero showdown equity from these matchups (sums each row's equityShare). */
+  yourEquity: number;
+  suggestion: Suggestion;
 }
 
 export interface StudyNote {
@@ -72,8 +118,15 @@ export interface Ruleset {
   readonly deck: readonly Card[];
   readonly holeCount: number;
   readonly showdownBoardCount: number;
+  /** Hand category names, weakest first; a rank value starts with the index. */
+  readonly categories: readonly string[];
   validate(snapshot: Snapshot): void;
   rank(hole: readonly Card[], board: readonly Card[]): HandRank | null;
+  /**
+   * Optional fast showdown score: larger wins, equal splits, and
+   * `Math.floor(score / 16 ** 5)` is the category index.
+   */
+  score?(hole: readonly Card[], board: readonly Card[]): number;
   legalActions(snapshot: Snapshot): Action[];
   study(snapshot: Snapshot, equity: Equity): StudyNote;
 }

@@ -90,3 +90,108 @@ test('preflop samples full boards deterministically and the river has no outlook
   assert.equal(analyze({ ...base, board: ['Qs', 'Js', '4d', '2c', '9h'] }).outlook, null);
   assert.equal(analyze(base).outlook.runouts, 1081);
 });
+
+// ---------------------------------------------------------------------------
+// Opponent matchups and suggestions
+// ---------------------------------------------------------------------------
+import { compareRank } from '../dist/core/cards.js';
+
+test('the fast score orders hands exactly like the full ranker', () => {
+  let seed = 20261109;
+  const random = () => (seed = (Math.imul(seed, 1103515245) + 12345) >>> 0) / 2 ** 32;
+  const deal = n => {
+    const deck = [...holdem.deck];
+    for (let i = 0; i < n; i++) {
+      const j = i + Math.floor(random() * (deck.length - i));
+      [deck[i], deck[j]] = [deck[j], deck[i]];
+    }
+    return deck.slice(0, n);
+  };
+  for (let i = 0; i < 5000; i++) {
+    const size = 5 + (i % 3);
+    const a = deal(size);
+    const b = deal(size);
+    const order = Math.sign(holdem.score([], a) - holdem.score([], b));
+    assert.equal(order, Math.sign(compareRank(holdem.rank([], a).value, holdem.rank([], b).value)), a + ' vs ' + b);
+    assert.equal(Math.floor(holdem.score([], a) / 16 ** 5), holdem.rank([], a).value[0]);
+  }
+  // Wheel, steel wheel, and a full house built from two sets.
+  assert.equal(Math.floor(holdem.score(['As', '2d'], ['3c', '4h', '5s']) / 16 ** 5), 4);
+  assert.equal(Math.floor(holdem.score(['As', '2s'], ['3s', '4s', '5s', 'Kd']) / 16 ** 5), 8);
+  assert.ok(holdem.score(['Kh', 'Kd'], ['Kc', '7s', '7d', '7h', '2c'])
+    > holdem.score(['Qh', 'Qd'], ['Qc', '7s', '7d', '7h', '2c']));
+});
+
+// A K of spades against a set of queens on the turn. Rivers counted by hand
+// from the 44 unseen cards: Ts makes a royal flush; seven other spades make a
+// winning flush; 2s and 4s make a flush but pair the board for the opponent's
+// full house; Tc Td Th make a winning straight; everything else loses.
+const setOverDraw = { ...base, board: ['Qs', 'Js', '4d', '2c'], opponent: ['Qh', 'Qd'] };
+
+test('known opponent: per-hand matchups match a hand count', () => {
+  const outlook = handOutlook(setOverDraw, holdem);
+  assert.equal(outlook.opponent.model, 'known');
+  assert.equal(outlook.opponent.method, 'exact');
+  assert.equal(outlook.runouts, 44);
+  assert.equal(outlook.yourEquity, 10 / 44);
+  assert.equal(outlook.yourEquity, analyze(setOverDraw).equity.share);
+
+  const royal = row(outlook, 'Straight flush');
+  assert.equal(royal.byRiver, 1 / 44);
+  assert.deepEqual(royal.matchup, { win: 1, tie: 0, loss: 0, beatenBy: [] });
+
+  const flush = row(outlook, 'Flush');
+  assert.equal(flush.byRiver, 8 / 44);
+  assert.equal(flush.matchup.win, 6 / 8);
+  assert.deepEqual(flush.matchup.beatenBy, [{ name: 'Full house', chance: 2 / 8 }]);
+  assert.equal(flush.equityShare, 6 / 44);
+
+  assert.equal(row(outlook, 'Straight').matchup.win, 1);
+  assert.equal(row(outlook, 'One pair').matchup.win, 0);
+  const shares = outlook.rows.reduce((sum, r) => sum + r.equityShare, 0);
+  assert.ok(Math.abs(shares - 10 / 44) < 1e-12);
+});
+
+test('known opponent: their hand chances and wins add up', () => {
+  const { opponent } = handOutlook(setOverDraw, holdem);
+  assert.ok(Math.abs(opponent.rows.reduce((sum, r) => sum + r.chance, 0) - 1) < 1e-12);
+  assert.equal(opponent.beatsYou, 34 / 44);
+  assert.ok(Math.abs(opponent.equity - 34 / 44) < 1e-12);
+  // Qc gives them quads; the other non-winning rivers leave them a set or better.
+  assert.equal(opponent.rows.find(r => r.name === 'Four of a kind').chance, 1 / 44);
+  assert.ok(opponent.rows.every(r => r.category >= 3));
+});
+
+test('suggestion names the hands carrying equity and warns about losing ones', () => {
+  const { suggestion } = handOutlook(setOverDraw, holdem);
+  assert.deepEqual(suggestion.playFor.map(h => h.name), ['Flush', 'Straight']);
+  assert.equal(suggestion.playFor[0].winWhenMade, 0.75);
+  assert.equal(suggestion.playFor[0].equityShare, 6 / 44);
+  assert.ok(suggestion.caution.some(h => h.name === 'One pair' && h.winWhenMade === 0));
+  assert.equal(suggestion.holding, null);
+
+  // A flopped set is already likely to hold up.
+  const set = handOutlook({ ...base, hero: ['Qh', 'Qd'], opponent: [] }, holdem);
+  assert.equal(set.suggestion.holding.name, 'Three of a kind');
+  assert.ok(set.suggestion.holding.winWhenMade >= 0.75);
+});
+
+test('random opponent: turn matchups are exact and agree with equity; flop samples are repeatable', () => {
+  const turn = { ...base, board: ['Qs', 'Js', '4d', '2c'] };
+  const outlook = handOutlook(turn, holdem);
+  assert.equal(outlook.opponent.model, 'random');
+  assert.equal(outlook.opponent.method, 'exact');
+  assert.equal(outlook.opponent.matchups, 46 * 990); // 46 rivers × C(45, 2) opponent hands
+  // Exact equity counts every opponent hand and river, so the two agree.
+  const equity = analyze(turn).equity;
+  assert.equal(equity.method, 'sampled');
+  assert.ok(Math.abs(outlook.yourEquity - equity.share) <= equity.share - equity.interval[0] + 1e-9);
+
+  const flop = handOutlook(base, holdem);
+  assert.equal(flop.opponent.method, 'sampled');
+  assert.ok(flop.opponent.matchups >= 100000);
+  assert.deepEqual(flop, handOutlook(base, holdem));
+  for (const r of flop.rows.filter(r => r.matchup)) {
+    assert.ok(Math.abs(r.matchup.win + r.matchup.tie + r.matchup.loss - 1) < 1e-12, r.name);
+  }
+});
