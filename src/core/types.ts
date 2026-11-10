@@ -169,6 +169,28 @@ export interface BetAdvice {
   holdings: number;
   /** Board cards still to come; the model assumes no betting on them. */
   streetsLeft: number;
+  /** When facing a wager: what a call costs and the most it can win. */
+  callPrice?: {
+    cost: number;
+    /** Pot the call can win, excluding chips above the hero's total. */
+    winnablePot: number;
+    /** Break-even pot share: cost ÷ winnable pot. */
+    needEquity: number;
+  };
+}
+
+export interface FoldReason {
+  cost: number;
+  winnablePot: number;
+  needEquity: number;
+  /** Pot share a call actually wins, side pots included. */
+  haveEquity: number;
+  /** Chips a call loses on average. */
+  callLoss: number;
+  /** The least costly raise, if any raise is legal. */
+  bestRaise: BetOption | null;
+  /** Opponent styles against which folding is not best, with their best action. */
+  otherStyles: readonly { style: OpponentStyle; option: BetOption }[];
 }
 
 export interface StudyNote {

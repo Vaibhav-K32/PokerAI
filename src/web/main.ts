@@ -3,6 +3,7 @@ import type { analyze } from '../core/analyze.js';
 import type {
   Action, BetAdvice, BetOption, Card, OpponentStyle, Outlook, OutlookRow, Snapshot,
 } from '../core/types.js';
+import { explainFold } from '../core/sizing.js';
 import { cloudRecognizer, type Confidence, type Recognition } from '../vision/recognizer.js';
 
 function element<T extends HTMLElement>(id: string): T {
@@ -622,10 +623,33 @@ function renderSizing(body: HTMLElement, advice: BetAdvice) {
   } else {
     reason += top.kind === 'check' ? '. No bet size beats checking against ' + (advice.players > 1 ? 'these opponents.' : 'this opponent.') : '.';
   }
+  const fold = explainFold(advice, opponentStyle);
+  if (fold) {
+    // Spell out why: the price of calling against what the call wins.
+    reason = 'Calling costs ' + chips(fold.cost) + ' to win a pot of ' + chips(fold.winnablePot)
+      + ', so you need ' + wholePct(fold.needEquity) + ' equity. You have about ' + wholePct(fold.haveEquity)
+      + ', so calling loses about ' + fold.callLoss.toFixed(1) + ' chips on average.';
+  }
   add(headline, 'p', reason);
+  if (fold?.bestRaise) {
+    const raise = fold.bestRaise;
+    add(headline, 'p', 'Raising does not rescue it: the best raise (to ' + chips(raise.to) + (raise.allIn ? ', all-in' : '') + ') '
+      + (raise.ev < 0 ? 'still loses about ' + (-raise.ev).toFixed(1) + ' chips' : 'gains only ' + signed(raise.ev) + ' chips')
+      + '. ' + (advice.players > 1 ? 'Everyone folds only ' : 'They fold only ') + wholePct(raise.foldChance)
+      + ', and you have ' + wholePct(raise.equityWhenCalled) + ' equity when called.');
+  }
+  if (fold) {
+    add(headline, 'p', fold.otherStyles.length
+      ? fold.otherStyles.map(({ style, option }) => 'Against an opponent who ' + styleLabels[style].toLowerCase()
+        + ', ' + describeOption(option).toLowerCase() + ' instead (' + signed(option.ev) + ').').join(' ')
+      : 'Fold against every opponent style.');
+    if (advice.streetsLeft > 0) {
+      add(headline, 'p', 'Before the river this ignores later betting, which can change the answer either way.');
+    }
+  }
   body.append(headline);
 
-  if (advice.sensitive) {
+  if (advice.sensitive && !fold) {
     const parts = (['loose', 'balanced', 'tight'] as const).map(style => {
       const choice = advice.byStyle[style];
       return styleLabels[style].toLowerCase() + ': ' + describeOption(choice.options[choice.best]).toLowerCase();

@@ -105,3 +105,67 @@ test('near-identical choices across styles are not flagged as sensitive', () => 
   assert.deepEqual(picks, ['raise', 'raise', 'raise']);
   assert.equal(advice.sensitive, false);
 });
+
+// ---------------------------------------------------------------------------
+// Fold explanations
+// ---------------------------------------------------------------------------
+import { explainFold } from '../dist/core/sizing.js';
+
+test('fold explanation: needed equity, actual equity, and what calling loses', () => {
+  // 7-2 offsuit on a river it missed, facing a pot-size bet of 100 into 100.
+  const facing = { ...spot, hero: ['7c', '2d'], board: ['Qs', 'Js', '4d', 'Ah', '9c'], pot: 200, faced: 100, increment: 100, heroStack: 400, opponentStack: 300 };
+  const advice = betAdvice(facing, holdem);
+  assert.deepEqual(advice.callPrice, { cost: 100, winnablePot: 300, needEquity: 1 / 3 });
+  const reason = explainFold(advice, 'balanced');
+  assert.ok(reason, 'fold is suggested');
+  const call = advice.byStyle.balanced.options.find(o => o.kind === 'call');
+  // The call EV identity: have × pot − cost.
+  near(reason.haveEquity * 300 - 100, call.ev, 'call value');
+  near(reason.callLoss, -call.ev, 'call loss');
+  near(call.ev, analyze(facing).study.callValue, 'matches the call study');
+  assert.ok(reason.haveEquity < reason.needEquity);
+  assert.equal(reason.bestRaise.kind, 'raise');
+  assert.ok(reason.bestRaise.ev <= 0);
+  // A loose opponent never folds enough for a bluff-raise either.
+  assert.ok(!reason.otherStyles.some(o => o.style === 'loose'));
+});
+
+test('fold explanation is absent when folding is not suggested or nothing is faced', () => {
+  const strong = { ...spot, hero: ['Ac', 'Ad'], board: ['Qs', 'Js', '4d', 'Ah', '9c'], pot: 200, faced: 100, increment: 100, heroStack: 400, opponentStack: 300 };
+  assert.equal(explainFold(betAdvice(strong, holdem), 'balanced'), null);
+  const noBet = betAdvice({ ...spot, hero: ['7c', '2d'], board: ['Qs', 'Js', '4d', 'Ah', '9c'] }, holdem);
+  assert.equal(noBet.callPrice, undefined);
+  assert.equal(explainFold(noBet, 'balanced'), null);
+});
+
+test('fold explanation names styles where folding is wrong', () => {
+  // A weak hand facing a small bet: tight opponents fold enough to raise.
+  const facing = { ...spot, hero: ['7c', '2d'], board: ['Qs', 'Js', '4d', 'Ah', '9c'], pot: 120, faced: 20, increment: 20, heroStack: 1000, opponentStack: 1000 };
+  const advice = betAdvice(facing, holdem);
+  const reason = explainFold(advice, 'balanced');
+  if (reason) {
+    for (const { style, option } of reason.otherStyles) {
+      assert.notEqual(option.kind, 'fold');
+      assert.equal(advice.byStyle[style].options[advice.byStyle[style].best], option);
+    }
+  }
+  const tight = advice.byStyle.tight.options[advice.byStyle.tight.best];
+  assert.equal(tight.kind, 'raise');
+});
+
+test('fold explanation counts side pots with several opponents', () => {
+  // River: the short stack all-in for 30 has a straight, the deep player bets
+  // 100 with aces, and you hold a weak pair. You win nothing, so you need
+  // 100/280 and have 0.
+  const multi = {
+    version: 2, ruleset: holdem.id, purpose: 'simulation',
+    hero: ['3h', '3d'], board: ['2c', '7d', 'Jc', 'Ks', '9h'],
+    opponents: [{ stack: 0, committed: 30, cards: ['Qh', 'Td'] }, { stack: 200, committed: 100, cards: ['Ah', 'Ac'] }],
+    pot: 180, heroStack: 500, committed: 0, increment: 70,
+  };
+  const reason = explainFold(adviceFor(multi, holdem), 'balanced');
+  assert.equal(reason.winnablePot, 280);
+  near(reason.needEquity, 100 / 280, 'needed');
+  near(reason.haveEquity, 0, 'have');
+  near(reason.callLoss, 100, 'loss');
+});

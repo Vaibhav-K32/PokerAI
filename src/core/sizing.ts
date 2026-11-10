@@ -1,7 +1,7 @@
 import { combinations } from './cards.js';
 import { deadMoney, draw, faced, heroPayout, knownCards, potCaps, scorer, seededRandom, wager } from './table.js';
 import type {
-  Action, BetAdvice, BetOption, Card, OpponentStyle, Ruleset, Snapshot,
+  Action, BetAdvice, BetOption, Card, FoldReason, OpponentStyle, Ruleset, Snapshot,
 } from './types.js';
 
 /**
@@ -314,7 +314,7 @@ export function betAdvice(s: Snapshot, rules: Ruleset): BetAdvice {
     const same = own.options.find(o => o.kind === choice.kind && o.to === choice.to);
     return !same || own.options[own.best].ev - same.ev > SENSITIVE_SHARE * s.pot;
   }));
-  return {
+  const advice: BetAdvice = {
     byStyle,
     sensitive,
     opponent: s.opponents.every(o => o.cards.length) ? 'known' : 'random',
@@ -322,5 +322,41 @@ export function betAdvice(s: Snapshot, rules: Ruleset): BetAdvice {
     method: single ? 'exact' : 'sampled',
     holdings: range.length,
     streetsLeft: rules.showdownBoardCount - s.board.length,
+  };
+  const toCall = faced(s);
+  if (toCall > 0) {
+    // The price of calling: chips above the hero's total cannot be won.
+    const cost = Math.min(toCall, s.heroStack);
+    const unmatched = s.opponents.reduce((sum, o) => sum + Math.max(0, o.committed - s.committed - cost), 0);
+    const winnablePot = s.pot - unmatched + cost;
+    advice.callPrice = { cost, winnablePot, needEquity: cost / winnablePot };
+  }
+  return advice;
+}
+
+/**
+ * Why folding is the suggestion for a style, or null when it is not. Compares
+ * the equity a call needs with the pot share it actually wins (side pots
+ * included), reports the least costly raise, and lists the opponent styles
+ * against which the hero should not fold.
+ */
+export function explainFold(advice: BetAdvice, style: OpponentStyle): FoldReason | null {
+  const { options, best } = advice.byStyle[style];
+  if (options[best].kind !== 'fold' || !advice.callPrice) return null;
+  const call = options.find(o => o.kind === 'call');
+  if (!call) return null;
+  const { cost, winnablePot, needEquity } = advice.callPrice;
+  const raises = options.filter(o => o.kind === 'raise');
+  const bestRaise = raises.length ? raises.reduce((a, b) => (b.ev > a.ev ? b : a)) : null;
+  return {
+    cost,
+    winnablePot,
+    needEquity,
+    haveEquity: (call.ev + cost) / winnablePot,
+    callLoss: -call.ev,
+    bestRaise,
+    otherStyles: STYLES.filter(other => other !== style)
+      .map(other => ({ style: other, option: advice.byStyle[other].options[advice.byStyle[other].best] }))
+      .filter(({ option }) => option.kind !== 'fold'),
   };
 }
