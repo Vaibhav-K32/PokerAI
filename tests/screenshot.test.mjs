@@ -13,7 +13,7 @@ import { matchObservation } from '../dist/history/observation.js';
 import { claudeScreenshotProvider, fixtureProvider, localScreenshotProvider } from '../dist/vision/providers.js';
 import { drawTable, fixtureById, SCREENSHOT_FIXTURES } from '../dist/vision/screenshot-fixtures.js';
 import {
-  corrected, correctedCard, indicator, MAX_CHIPS, parseChipInput, parseScreenshotResponse, restoreRecognition, reviewScreenshot,
+  corrected, correctedCard, indicator, indicatorLabels, MAX_CHIPS, moveSeat, needsReview, parseChipInput, parseScreenshotResponse, seatMoveMap, restoreRecognition, reviewScreenshot,
   toStudySnapshot, toTableObservation,
 } from '../dist/vision/screenshot.js';
 import { createRecognizeHandler, SCREENSHOT_SCHEMA } from '../scripts/recognize.mjs';
@@ -74,7 +74,7 @@ test('unreadable text: missing stacks, pot, and blinds are flagged, not filled i
   const rec = recognize('unreadable-text');
   assert.ok(rec.players.every(p => p.stack.value === null && p.name.value === null));
   assert.equal(rec.pot.value, null);
-  assert.equal(indicator(rec.players[1].bet), 'review'); // low confidence
+  assert.equal(indicator(rec.players[1].bet), 'low');
   assert.equal(indicator(rec.players[2].bet), 'unknown');
   const fields = reviews(rec).map(i => i.field);
   for (const field of ['players.0.stack', 'players.1.stack', 'players.2.stack', 'pot', 'bigBlind', 'players.2.bet', 'players.1.bet']) {
@@ -88,14 +88,21 @@ test('unreadable text: missing stacks, pot, and blinds are flagged, not filled i
 // Confidence and validation
 // ---------------------------------------------------------------------------
 
-test('confidence indicators: high, needs review, unknown; inferred and corrected values', () => {
+test('confidence indicators: high, medium, low, not rated, unknown, and corrected', () => {
   assert.equal(indicator({ value: 5, confidence: 'high', source: 'observed' }), 'high');
-  assert.equal(indicator({ value: 5, confidence: 'medium', source: 'observed' }), 'review');
-  assert.equal(indicator({ value: 5, confidence: null, source: 'observed' }), 'review'); // no estimate, not a fake score
+  assert.equal(indicator({ value: 5, confidence: 'medium', source: 'observed' }), 'medium');
+  assert.equal(indicator({ value: 5, confidence: 'low', source: 'observed' }), 'low');
+  assert.equal(indicator({ value: 5, confidence: null, source: 'observed' }), 'unrated'); // no estimate, not a fake score
   assert.equal(indicator({ value: null, confidence: null, source: 'observed' }), 'unknown');
-  assert.equal(indicator({ value: 'flop', confidence: null, source: 'inferred' }), 'review');
-  assert.equal(indicator(corrected(7)), 'high');
+  assert.equal(indicator({ value: 'flop', confidence: null, source: 'inferred' }), 'unrated');
+  assert.equal(indicator(corrected(7)), 'corrected');
   assert.equal(indicator(corrected(null)), 'unknown');
+  assert.deepEqual(Object.values(indicatorLabels), ['High confidence', 'Medium confidence', 'Low confidence', 'Not rated', 'Unknown', 'Corrected']);
+  assert.ok(Object.values(indicatorLabels).every(label => !/\d|%/.test(label)), 'no numeric scores');
+  // Only unconfirmed values need review; high, corrected, and unknown do not.
+  assert.deepEqual(['high', 'medium', 'low', null].map(confidence => needsReview({ value: 1, confidence, source: 'observed' })), [false, true, true, true]);
+  assert.equal(needsReview(corrected(1)), false);
+  assert.equal(needsReview(corrected(null)), false);
   // A missing value never carries a confidence, even if the provider sent one.
   const rec = parseScreenshotResponse({ modelId: 'm', result: { ...fixtureById('heads-up-preflop').response.result, pot: { value: null, confidence: 'high' } } }, 'x');
   assert.deepEqual(rec.pot, { value: null, confidence: null, source: 'observed' });
@@ -420,4 +427,68 @@ test('the reader says whether the pot includes bets; unclear answers are flagged
   assert.throws(() => read({ ...base, potIncludesBets: { value: 'yes', confidence: 'high' } }), /pot includes bets/);
   assert.deepEqual(restoreRecognition(JSON.parse(JSON.stringify(low))).potIncludesBetsRead, low.potIncludesBetsRead);
   assert.ok(SCREENSHOT_SCHEMA.required.includes('potIncludesBets'));
+});
+
+// ---------------------------------------------------------------------------
+// Seat order and confidence after corrections
+// ---------------------------------------------------------------------------
+
+test('moving seats keeps each player whole and keeps your seat and the dealer with their players', () => {
+  const rec = recognize('four-player-turn'); // You (hero), Pat, Lee (folded, dealer), Kim
+  const snapshotOf = r => JSON.stringify(r.players.map(p => [p.name.value, p.stack.value, p.bet.value, p.status.value, p.cards.map(c => c.value)]));
+  const byName = r => Object.fromEntries(r.players.map(p => [p.name.value, p]));
+  const down = moveSeat(rec, 1, 2); // Pat moves after Lee
+  assert.deepEqual(down.players.map(p => p.name.value), ['You', 'Lee', 'Pat', 'Kim']);
+  assert.equal(down.players[down.heroSeat.value].name.value, 'You');
+  assert.equal(down.players[down.dealerSeat.value].name.value, 'Lee');
+  assert.equal(down.dealerSeat.source, rec.dealerSeat.source, 'the assignment is unchanged, so its reader label stays');
+  for (const [name, p] of Object.entries(byName(rec))) assert.deepEqual(byName(down)[name], p, name + ' kept every field');
+  assert.equal(down.seatOrderCorrected, true);
+
+  // Moving the hero and the dealer themselves.
+  const heroLast = moveSeat(rec, 0, 3);
+  assert.deepEqual(heroLast.players.map(p => p.name.value), ['Pat', 'Lee', 'Kim', 'You']);
+  assert.deepEqual([heroLast.heroSeat.value, heroLast.players[heroLast.dealerSeat.value].name.value], [3, 'Lee']);
+  const back = moveSeat(heroLast, 3, 0);
+  assert.equal(snapshotOf(back), snapshotOf(rec));
+  assert.deepEqual([back.heroSeat.value, back.dealerSeat.value], [rec.heroSeat.value, rec.dealerSeat.value]);
+
+  // Invalid moves change nothing.
+  for (const [from, to] of [[0, 0], [-1, 1], [0, 4], [1.5, 2], [4, 0]]) assert.equal(moveSeat(rec, from, to), rec, from + ' to ' + to);
+  // Unknown assignments stay unknown.
+  const noDealer = moveSeat({ ...rec, dealerSeat: corrected(null) }, 0, 1);
+  assert.equal(noDealer.dealerSeat.value, null);
+  assert.deepEqual(seatMoveMap(4, 1, 2), [0, 2, 1, 3]);
+  assert.deepEqual(seatMoveMap(4, 3, 0), [1, 2, 3, 0]);
+});
+
+test('a reordered state is revalidated, imports with the right players, and survives saving', () => {
+  const rec = recognize('four-player-turn');
+  const moved = moveSeat(moveSeat(rec, 3, 1), 0, 2); // Kim forward, then You to the middle
+  assert.deepEqual(moved.players.map(p => p.name.value), ['Kim', 'Pat', 'You', 'Lee']);
+  assert.deepEqual(errors(moved), []);
+  const before = toStudySnapshot(rec, 'completed').snapshot;
+  const after = toStudySnapshot(moved, 'completed').snapshot;
+  assert.deepEqual(after.hero, before.hero);
+  assert.equal(after.heroStack, before.heroStack);
+  const opponents = s => s.opponents.map(o => [o.stack, o.committed]).sort((a, b) => a[0] - b[0]);
+  assert.deepEqual(opponents(after), opponents(before));
+  assert.equal(after.pot, before.pot);
+  // Problems follow the player, not the old position.
+  const dup = moveSeat(setCard(rec, 'players.0.cards.0', 'Kh'), 0, 3);
+  assert.ok(errors(dup).some(e => e.field === 'players.3.cards.0'), 'the duplicate is reported at the hero seat after the move');
+  const restored = restoreRecognition(JSON.parse(JSON.stringify(moved)));
+  assert.deepEqual(restored, moved);
+});
+
+test('confidence labels update after corrections, and moved seats keep theirs', () => {
+  const rec = recognize('partially-hidden'); // hero card 1 read as medium, card 2 unknown
+  assert.equal(indicator(rec.players[0].cards[0]), 'medium');
+  assert.equal(indicator(rec.players[0].cards[1]), 'unknown');
+  const fixed = setCard(setCard(rec, 'players.0.cards.0', '8s'), 'players.0.cards.1', '8h');
+  assert.deepEqual(fixed.players[0].cards.map(indicator), ['corrected', 'corrected']);
+  assert.ok(!reviews(fixed).some(i => i.field.startsWith('players.0.cards')));
+  const moved = moveSeat(fixed, 0, 1);
+  assert.deepEqual(moved.players[1].cards.map(indicator), ['corrected', 'corrected']);
+  assert.equal(indicator(moved.players[0].stack), 'high', 'a moved seat keeps its reader labels');
 });

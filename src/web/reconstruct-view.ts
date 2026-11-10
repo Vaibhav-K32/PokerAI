@@ -12,7 +12,7 @@ import { RecognitionQueue } from '../reconstruction/queue.js';
 import { matchHistory, reconstructHand } from '../reconstruction/reconstruct.js';
 import { ACTION_LABELS } from '../reconstruction/resolve.js';
 import {
-  addScreenshots, createSession, liveResolutions, moveScreenshot, parseSession, removeScreenshot, sequenceObservations,
+  addScreenshots, createSession, liveResolutions, moveScreenshot, parseSession, remapActionSeats, removeScreenshot, sequenceObservations,
   serializeSession, setResolution, uploadOrder,
 } from '../reconstruction/session.js';
 import {
@@ -22,7 +22,7 @@ import {
 } from '../reconstruction/types.js';
 import { claudeScreenshotProvider, fixtureProvider, type ScreenshotProvider } from '../vision/providers.js';
 import { drawTable } from '../vision/screenshot-fixtures.js';
-import type { ScreenshotRecognition } from '../vision/screenshot.js';
+import { seatMoveMap, type ScreenshotRecognition } from '../vision/screenshot.js';
 import { loadHands } from './hand-store.js';
 import { decodeImage, fileProblem, jpegDataUrlToBlob, prepareUpload, svgToPng } from './image.js';
 import { renderRecognitionEditor } from './recognition-editor.js';
@@ -553,9 +553,13 @@ export function initReconstruction(options: { replay: ReplayController }) {
     }
     editor.replaceChildren();
     if (!shot?.url) add(editor, 'p', 'The image was not saved with this reconstruction; only the recognized state is available.', 'fine-print');
-    renderRecognitionEditor(editor, observation.recognition, next => {
+    renderRecognitionEditor(editor, observation.recognition, (next, info) => {
       const current = observations.get(observation.screenshotId);
       if (!current) return;
+      if (info?.seatMove) {
+        // Confirmed actions name seats by position in this screenshot; keep them on the same players.
+        resolutions = remapActionSeats(resolutions, current.id, seatMoveMap(current.recognition.players.length, info.seatMove.from, info.seatMove.to));
+      }
       observations.set(observation.screenshotId, withRecognition(current, next));
       dirty = true;
       refresh();

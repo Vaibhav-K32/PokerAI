@@ -9,7 +9,7 @@ import { applyHandEvent, createHandState, replayHand, replaySteps } from '../dis
 import { buildEvents, createHistory, settlementSpecs } from '../dist/history/history.js';
 import { fixtureProvider } from '../dist/vision/providers.js';
 import { drawTable } from '../dist/vision/screenshot-fixtures.js';
-import { corrected, correctedCard, parseScreenshotResponse } from '../dist/vision/screenshot.js';
+import { corrected, correctedCard, moveSeat, parseScreenshotResponse, seatMoveMap } from '../dist/vision/screenshot.js';
 import { alignSeats, compareObservations } from '../dist/reconstruction/compare.js';
 import { SEQUENCE_FIXTURES, sequenceById } from '../dist/reconstruction/fixtures.js';
 import {
@@ -19,7 +19,7 @@ import { RecognitionQueue } from '../dist/reconstruction/queue.js';
 import { matchHistory, reconstructHand } from '../dist/reconstruction/reconstruct.js';
 import { checkActions, checkpointState } from '../dist/reconstruction/resolve.js';
 import {
-  addScreenshots, createSession, liveResolutions, moveScreenshot, parseSession, removeScreenshot, sequenceObservations,
+  addScreenshots, createSession, liveResolutions, moveScreenshot, parseSession, remapActionSeats, removeScreenshot, sequenceObservations,
   serializeSession, setResolution, uploadOrder,
 } from '../dist/reconstruction/session.js';
 import { MAX_SCREENSHOTS } from '../dist/reconstruction/types.js';
@@ -560,4 +560,23 @@ test('resolutions follow reordering: a pair that is no longer adjacent is droppe
   assert.deepEqual(liveResolutions(reordered, resolutions), []);
   const restored = restoreObservation(JSON.parse(JSON.stringify(obs[0])));
   assert.deepEqual(restored, obs[0]);
+});
+
+test('reordering seats keeps confirmed actions on the same players and counts as a correction', () => {
+  const obs = observationsOf('complete-hand');
+  const actions = [action('a1', 0, 'check'), action('a2', 1, 'bet', 20), action('a3', 2, 'fold'), action('a4', 0, 'call')];
+  const resolutions = [{ from: obs[1].id, to: obs[2].id, mark: 'none', actions }];
+  // Move You (seat 0) to the end of screenshot 2's seat list.
+  const map = seatMoveMap(3, 0, 2);
+  const moved = withRecognition(obs[1], moveSeat(obs[1].recognition, 0, 2));
+  assert.deepEqual(moved.recognition.players.map(p => p.name.value), ['Riley', 'Sam', 'You']);
+  assert.equal(moved.reviewStatus, 'corrected');
+  const remapped = remapActionSeats(resolutions, obs[1].id, map);
+  assert.deepEqual(remapped[0].actions.map(a => moved.recognition.players[a.seat].name.value), ['You', 'Riley', 'Sam', 'You']);
+  assert.deepEqual(remapActionSeats(resolutions, 'other', map), resolutions, 'other intervals are untouched');
+  const result = reconstructHand([obs[0], moved, obs[2]], { resolutions: remapped });
+  assert.equal(result.metrics.correctedFields, 1);
+  // Screenshot 2 is now in a different seat order from its neighbours; the names line it up again.
+  assert.ok(result.intervals[1].differences.some(d => d.kind === 'seats-moved' && d.severity === 'review'));
+  assert.equal(result.intervals[1].status, 'resolved', 'the same actions still explain the change');
 });

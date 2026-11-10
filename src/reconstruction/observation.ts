@@ -31,8 +31,9 @@ export function fieldConfidence(rec: ScreenshotRecognition): Record<string, Conf
   return Object.fromEntries(recognitionFields(rec).map(([path, f]) => [path, f.confidence]));
 }
 
+/** Corrected fields, counting a changed seat order as one correction. */
 export function correctedFieldCount(rec: ScreenshotRecognition): number {
-  return recognitionFields(rec).filter(([, f]) => f.source === 'corrected').length;
+  return recognitionFields(rec).filter(([, f]) => f.source === 'corrected').length + (rec.seatOrderCorrected ? 1 : 0);
 }
 
 /** `corrected` once any field was edited; otherwise what the user marked. */

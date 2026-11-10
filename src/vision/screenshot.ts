@@ -54,6 +54,8 @@ export interface ScreenshotRecognition {
   readonly heroSeat: RecognizedField<number>;
   readonly street: RecognizedField<Street>;
   readonly warnings: readonly string[];
+  /** True once the user changed the seat order. */
+  readonly seatOrderCorrected?: boolean;
 }
 
 export const MAX_SCREEN_PLAYERS = 10;
@@ -163,21 +165,62 @@ export function inferStreet(board: readonly RecognizedCard[]): RecognizedField<S
 // Confidence indicators
 // ---------------------------------------------------------------------------
 
-export type Indicator = 'high' | 'review' | 'unknown';
-
 /**
- * Neutral indicator for one field: High confidence for clearly read or
- * user-corrected values, Needs review for anything uncertain or inferred,
- * Unknown when there is no value.
+ * How a field is shown: the reader's own label (high, medium, low), `unrated`
+ * when a value has no usable label (an inferred value, or a provider that gave
+ * none), `unknown` when there is no value, and `corrected` once the user set it.
+ * Labels are not probabilities, and no number is ever shown.
  */
+export type Indicator = 'high' | 'medium' | 'low' | 'unrated' | 'unknown' | 'corrected';
+
 export function indicator(field: RecognizedField<unknown>): Indicator {
+  if (field.source === 'corrected') return field.value === null ? 'unknown' : 'corrected';
   if (field.value === null) return 'unknown';
-  if (field.source === 'corrected') return 'high';
-  if (field.source === 'observed' && field.confidence === 'high') return 'high';
-  return 'review';
+  if (field.source === 'inferred' || field.confidence === null) return 'unrated';
+  return field.confidence;
 }
 
-export const indicatorLabels: Record<Indicator, string> = { high: 'High confidence', review: 'Needs review', unknown: 'Unknown' };
+export const indicatorLabels: Record<Indicator, string> = {
+  high: 'High confidence', medium: 'Medium confidence', low: 'Low confidence',
+  unrated: 'Not rated', unknown: 'Unknown', corrected: 'Corrected',
+};
+
+/** True for a value that is present but not confirmed: medium, low, or unrated. */
+export function needsReview(field: RecognizedField<unknown>): boolean {
+  const level = indicator(field);
+  return level === 'medium' || level === 'low' || level === 'unrated';
+}
+
+// ---------------------------------------------------------------------------
+// Seat order
+// ---------------------------------------------------------------------------
+
+/** Where each seat ends up when the seat at `from` moves to `to`: result[old] = new. */
+export function seatMoveMap(count: number, from: number, to: number): number[] {
+  const order = Array.from({ length: count }, (_, i) => i);
+  const [moved] = order.splice(from, 1);
+  order.splice(to, 0, moved);
+  const map = new Array<number>(count);
+  order.forEach((old, index) => { map[old] = index; });
+  return map;
+}
+
+/**
+ * Move one seat to another position, keeping every player's cards, chips,
+ * status, and name together. Your seat and the dealer stay with the same
+ * players (their reader labels are kept, since the assignment did not
+ * change). Out-of-range or no-op moves return the recognition unchanged.
+ */
+export function moveSeat(rec: ScreenshotRecognition, from: number, to: number): ScreenshotRecognition {
+  const n = rec.players.length;
+  const valid = (i: number) => Number.isSafeInteger(i) && i >= 0 && i < n;
+  if (!valid(from) || !valid(to) || from === to) return rec;
+  const map = seatMoveMap(n, from, to);
+  const players = new Array<RecognizedPlayer>(n);
+  rec.players.forEach((p, i) => { players[map[i]] = p; });
+  const follow = (f: RecognizedField<number>): RecognizedField<number> => (f.value === null ? f : { ...f, value: map[f.value] });
+  return { ...rec, players, heroSeat: follow(rec.heroSeat), dealerSeat: follow(rec.dealerSeat), seatOrderCorrected: true };
+}
 
 /**
  * Read a chip amount typed by the user. Blank means unknown. Rejects input
@@ -244,7 +287,7 @@ export function reviewScreenshot(rec: ScreenshotRecognition): ReviewIssue[] {
   }
   rec.communityCards.forEach((c, i) => {
     if (c.value === null) review('board.' + i, c.hidden ? 'Board card ' + (i + 1) + ' is face-down.' : 'Board card ' + (i + 1) + ' could not be read.');
-    else if (indicator(c) === 'review') review('board.' + i, 'Board card ' + (i + 1) + ' (' + c.value + ') is ambiguous.');
+    else if (needsReview(c)) review('board.' + i, 'Board card ' + (i + 1) + ' (' + c.value + ') is ambiguous.');
   });
   const implied = BOARD_STREET[boardCount];
   if (rec.street.value && implied && rec.street.value !== implied) {
@@ -259,14 +302,14 @@ export function reviewScreenshot(rec: ScreenshotRecognition): ReviewIssue[] {
     if (p.cards.length === 1) error('players.' + i + '.cards', label + ' has one hole card; a seat shows zero or two.');
     p.cards.forEach((c, j) => {
       if (c.value === null && !c.hidden) review('players.' + i + '.cards.' + j, possessive(label) + ' card ' + (j + 1) + ' could not be read.');
-      else if (c.value !== null && indicator(c) === 'review') review('players.' + i + '.cards.' + j, possessive(label) + ' card ' + (j + 1) + ' (' + c.value + ') is ambiguous.');
+      else if (c.value !== null && needsReview(c)) review('players.' + i + '.cards.' + j, possessive(label) + ' card ' + (j + 1) + ' (' + c.value + ') is ambiguous.');
     });
     if (p.status.value !== 'folded') {
       if (p.stack.value === null) review('players.' + i + '.stack', possessive(label) + ' stack is unreadable or missing.');
-      else if (indicator(p.stack) === 'review') review('players.' + i + '.stack', possessive(label) + ' stack (' + p.stack.value + ') needs checking.');
+      else if (needsReview(p.stack)) review('players.' + i + '.stack', possessive(label) + ' stack (' + p.stack.value + ') needs checking.');
     }
     if (p.bet.value === null) review('players.' + i + '.bet', possessive(label) + ' bet could not be read. Enter 0 if there is none.');
-    else if (indicator(p.bet) === 'review') review('players.' + i + '.bet', possessive(label) + ' bet (' + p.bet.value + ') needs checking.');
+    else if (needsReview(p.bet)) review('players.' + i + '.bet', possessive(label) + ' bet (' + p.bet.value + ') needs checking.');
     if (p.status.value === null) review('players.' + i + '.status', 'Is ' + label + ' still in the hand?');
   });
   const live = rec.players.filter(p => p.status.value !== 'folded');
@@ -282,7 +325,7 @@ export function reviewScreenshot(rec: ScreenshotRecognition): ReviewIssue[] {
 
   // Chips.
   if (rec.pot.value === null) review('pot', 'The pot was not found.');
-  else if (indicator(rec.pot) === 'review') review('pot', 'The pot (' + rec.pot.value + ') needs checking.');
+  else if (needsReview(rec.pot)) review('pot', 'The pot (' + rec.pot.value + ') needs checking.');
   const bets = rec.players.reduce((sum, p) => sum + (p.bet.value ?? 0), 0);
   if (rec.potIncludesBets && rec.pot.value !== null && rec.pot.value < bets) {
     error('pot', 'The pot (' + rec.pot.value + ') is smaller than the bets in front of players (' + bets + ').');
@@ -293,7 +336,7 @@ export function reviewScreenshot(rec: ScreenshotRecognition): ReviewIssue[] {
   if (rec.bigBlind.value === 0) error('bigBlind', 'The big blind must be positive.');
   if (rec.smallBlind.value === 0) error('smallBlind', 'The small blind must be positive.');
   const read = rec.potIncludesBetsRead;
-  if (rec.pot.value !== null && bets > 0 && (!read || indicator(read) !== 'high')) {
+  if (rec.pot.value !== null && bets > 0 && (!read || read.value === null || needsReview(read))) {
     review('potIncludesBets', read?.value === null || !read
       ? 'It is not clear whether the pot shown already includes the bets in front of players. Tick the box if it does.'
       : 'Check whether the pot shown already includes the bets in front of players (read as ' + (read.value ? 'included' : 'not included') + ').');
@@ -435,6 +478,7 @@ export function restoreRecognition(raw: unknown): ScreenshotRecognition {
     dealerSeat: restoreField(raw.dealerSeat, seatIndex, 'saved dealer'),
     heroSeat: restoreField(raw.heroSeat, seatIndex, 'saved seat'),
     street: restoreField(raw.street, isStreet, 'saved street'),
+    ...(raw.seatOrderCorrected === true ? { seatOrderCorrected: true } : {}),
     warnings: Array.isArray(raw.warnings) ? raw.warnings.filter((s): s is string => typeof s === 'string').slice(0, 8) : [],
   };
 }

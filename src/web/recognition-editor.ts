@@ -3,7 +3,7 @@
 // produces a new recognition (marked as corrected) and is re-checked.
 import type { Card } from '../core/types.js';
 import {
-  corrected, correctedCard, indicator, indicatorLabels, inferStreet, MAX_CHIPS, parseChipInput, reviewScreenshot,
+  corrected, correctedCard, indicator, indicatorLabels, inferStreet, MAX_CHIPS, moveSeat, parseChipInput, reviewScreenshot,
   type RecognizedCard, type RecognizedField, type RecognizedPlayer, type ReviewIssue, type ScreenshotRecognition, type Street,
 } from '../vision/screenshot.js';
 import { pickCard } from './card-picker.js';
@@ -11,6 +11,14 @@ import { cardName, renderCardFace } from './cards-view.js';
 
 const MAX_SEATS = 10;
 const unknown = <T>(): RecognizedField<T> => corrected<T>(null);
+/** ID of the control to focus after the next redraw, so keyboard users keep their place after moving a seat. */
+let pendingFocus: string | null = null;
+
+/** Extra detail about an edit, for callers that keep references to seats by index. */
+export interface EditInfo {
+  /** The seat at `from` moved to `to`; other seats shifted to make room. */
+  readonly seatMove?: { readonly from: number; readonly to: number };
+}
 
 function add<K extends keyof HTMLElementTagNameMap>(parent: HTMLElement, tag: K, text = '', className = ''): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
@@ -27,7 +35,7 @@ function add<K extends keyof HTMLElementTagNameMap>(parent: HTMLElement, tag: K,
  * Returns the review issues for the recognition as drawn.
  */
 export function renderRecognitionEditor(
-  parent: HTMLElement, rec: ScreenshotRecognition, change: (next: ScreenshotRecognition) => void, group: string,
+  parent: HTMLElement, rec: ScreenshotRecognition, change: (next: ScreenshotRecognition, info?: EditInfo) => void, group: string,
 ): ReviewIssue[] {
   const r = rec;
   const issues = reviewScreenshot(r);
@@ -38,7 +46,7 @@ export function renderRecognitionEditor(
   function badge(host: HTMLElement, field: RecognizedField<unknown>, path: string) {
     const level = issues.some(i => i.field === path && i.severity === 'error') ? 'error' : indicator(field);
     const text = level === 'error' ? 'Conflict' : indicatorLabels[level];
-    const note = field.source === 'inferred' ? ' · inferred' : field.source === 'corrected' ? ' · edited' : '';
+    const note = field.source === 'inferred' ? ' · inferred' : field.source === 'corrected' && level === 'unknown' ? ' · set by you' : '';
     add(host, 'span', text + note, 'indicator ind-' + level);
   }
 
@@ -102,7 +110,25 @@ export function renderRecognitionEditor(
 
   function renderSeat(host: HTMLElement, p: RecognizedPlayer, i: number) {
     const seat = add(host, 'fieldset', '', 'review-seat' + (r.heroSeat.value === i ? ' is-hero' : ''));
-    add(seat, 'legend', 'Seat ' + (i + 1) + (p.name.value ? ' · ' + p.name.value : ''));
+    const label = 'Seat ' + (i + 1) + (p.name.value ? ' · ' + p.name.value : '');
+    add(seat, 'legend', label);
+    const order = add(seat, 'div', '', 'actions small-actions seat-order');
+    const move = (dir: -1 | 1) => {
+      const b = add(order, 'button', dir < 0 ? '↑ Move up' : '↓ Move down', 'secondary');
+      b.type = 'button';
+      b.id = group + '-move-' + (dir < 0 ? 'up' : 'down') + '-' + i;
+      b.setAttribute('aria-label', 'Move ' + label + (dir < 0 ? ' up, earlier in clockwise order' : ' down, later in clockwise order'));
+      b.disabled = dir < 0 ? i === 0 : i === r.players.length - 1;
+      b.addEventListener('click', () => {
+        const to = i + dir;
+        // Keep focus on the same control for the moved seat; at the end of the list, the opposite one.
+        const edge = dir < 0 ? to === 0 : to === r.players.length - 1;
+        pendingFocus = group + '-move-' + ((dir < 0) !== edge ? 'up' : 'down') + '-' + to;
+        change(moveSeat(r, i, to), { seatMove: { from: i, to } });
+      });
+    };
+    move(-1);
+    move(1);
     const top = add(seat, 'div', '', 'review-row');
     const nameWrap = add(top, 'label', '', 'review-field');
     add(nameWrap, 'span', 'Name', 'review-label');
@@ -219,6 +245,7 @@ export function renderRecognitionEditor(
   // Seats
   const seats = add(parent, 'fieldset', '', 'review-section');
   add(seats, 'legend', 'Seats (clockwise from the bottom)');
+  if (r.seatOrderCorrected) add(seats, 'p', 'Seat order changed by you. Your seat and the dealer moved with their players.', 'fine-print');
   r.players.forEach((p, i) => renderSeat(seats, p, i));
   const seatActions = add(seats, 'div', '', 'actions small-actions');
   const addSeat = add(seatActions, 'button', 'Add seat', 'secondary');
@@ -236,5 +263,10 @@ export function renderRecognitionEditor(
     const keep = (f: RecognizedField<number>) => (f.value === last ? unknown<number>() : f);
     return { ...x, players: x.players.slice(0, -1), dealerSeat: keep(x.dealerSeat), heroSeat: keep(x.heroSeat) };
   }));
+  if (pendingFocus) {
+    const target = parent.querySelector<HTMLButtonElement>('#' + CSS.escape(pendingFocus));
+    pendingFocus = null;
+    target?.focus();
+  }
   return issues;
 }

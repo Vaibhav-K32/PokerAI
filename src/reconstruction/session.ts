@@ -58,6 +58,17 @@ export function liveResolutions(observations: readonly HandObservation[], resolu
   return resolutions.filter(r => pairs.has(r.from + '>' + r.to));
 }
 
+/**
+ * After the seats of one observation were reordered (`map[old] = new`),
+ * point confirmed actions that start from it at the same players again.
+ * Actions refer to seats of the interval's earlier observation.
+ */
+export function remapActionSeats(resolutions: readonly IntervalResolution[], observationId: string, map: readonly number[]): IntervalResolution[] {
+  return resolutions.map(r => (r.from !== observationId || !r.actions.length ? r : {
+    ...r, actions: r.actions.map(a => (map[a.seat] === undefined ? a : { ...a, seat: map[a.seat] })),
+  }));
+}
+
 /** Replace (or add) the resolution for one interval. */
 export function setResolution(resolutions: readonly IntervalResolution[], next: IntervalResolution): IntervalResolution[] {
   const others = resolutions.filter(r => !(r.from === next.from && r.to === next.to));

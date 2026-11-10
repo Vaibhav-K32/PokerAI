@@ -30,7 +30,16 @@ Every value is a `RecognizedField`: the value or `null` for unknown, the reader�
 
 ## Review and correction
 
-Each field shows **High confidence**, **Needs review**, **Unknown**, or **Conflict**, with “inferred” or “edited” where it applies. Every field can be edited. Card slots open the same card picker as the study table, with cards in use elsewhere disabled and **Mark as unknown** to clear a card. Seats can be added or removed, and you mark your own seat and the dealer. Each change re-runs the checks.
+Each field shows one label:
+- **High confidence**, **Medium confidence**, or **Low confidence:** the reader's own label, never shown as a number.
+- **Not rated:** a value with no usable label, such as the street inferred from the board.
+- **Unknown:** no value.
+- **Corrected:** a value you set.
+- **Conflict:** the field is part of a blocking problem.
+
+Medium, low, and not-rated values are listed as fields to check.
+
+Every field can be edited. Card slots open the same card picker as the study table, with cards in use elsewhere disabled and **Mark as unknown** to clear a card. Seats can be added or removed, and **Move up** and **Move down** reorder them. Each player's cards, chips, and status move with them, and your seat and the dealer stay attached to the same players. You mark your own seat and the dealer. Each change re-runs the checks.
 
 Blocking problems prevent saving, attaching, and loading:
 - **Duplicate cards.**
@@ -89,5 +98,5 @@ The pipeline is provider-agnostic: anything that produces a `ScreenshotRecogniti
 - **Card regions:** they are not highlighted on the image, because the reader does not return coordinates.
 - **Stacks in big blinds:** a stack shown only in big blinds is read as unknown.
 - **Minimum raise:** a screenshot does not show the last raise size, so analysis uses the big blind as the minimum raise.
-- **Seat order:** seats must be listed clockwise from the bottom. Clients that rotate the hero to another position may need seats reordered by hand, by removing and re-adding them.
+- **Seat order:** seats must be listed clockwise from the bottom. If the reader gets the order wrong, or the client rotates the view, fix it with **Move up** and **Move down**. Players have no stable ID across screenshots; Reconstruct hand lines seats up by order and visible names, and keeps confirmed actions on the right players when you reorder seats.
 - **Study table limit:** it analyzes two to four players still in the hand. Larger screenshots can still be saved and attached to saved hands of up to 10 players.

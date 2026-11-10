@@ -312,6 +312,12 @@ footer { padding-block: 1.25rem 2rem; color: #425d55; font-size: .88rem; }
 .indicator { justify-self: start; padding: .05rem .4rem; border-radius: .3rem; font-size: .68rem; font-weight: 750; }
 .ind-high { background: #e3f1dc; color: #1b634b; }
 .ind-review { background: #fff1c2; color: #5a4a10; }
+.ind-medium { background: #fff1c2; color: #5a4a10; }
+.ind-low { background: #ffdcc2; color: #6e2c00; border: 1px solid #c4651f; }
+.ind-unrated { background: #f4f5f8; color: #34405a; border: 1px dashed #6a7591; }
+.ind-corrected { background: #dfe6f5; color: #1f3566; }
+.seat-order { margin: 0 0 .3rem; }
+.seat-order button { min-height: 2.2rem; padding: .2rem .55rem; font-size: .78rem; }
 .ind-unknown { background: #e8ebe7; color: #3f4d47; }
 .ind-error { background: #fbd5cf; color: #8a1c12; }
 .review-cards { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin: .4rem 0; }
