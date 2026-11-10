@@ -1,0 +1,41 @@
+# Poker Study specification
+
+## Purpose
+
+Study simulated hands and reconstruct completed hands on a phone or desktop. Start with heads-up no-limit Texas Hold’em snapshots using integer study chips. The user explicitly identifies each scenario as a simulation or a completed hand and starts the analysis. The product scope excludes live gambling assistance, overlays, screen sharing, background capture, table integrations, and execution of poker actions. The app cannot verify the circumstances of a manually entered hand.
+
+## User flows
+
+- **Table setup.** Load a sample or pick cards on a heads-up table: two hero cards, a board with zero, three, four, or five cards filled from the left, and optionally two known opponent cards. Record the pot, stacks behind, amount to call, hero street commitment, and minimum bet or last full raise increment on the table. Verify the snapshot and select Analyze. Known opponent cards in a reconstruction are hindsight information.
+- **Photo scan.** Explicitly take one still on a supporting phone or select a local image, laid out with opponent cards farthest from the camera, the board in the middle, and hero cards nearest. Preview it, then optionally press **Read cards with Claude** to send it for cloud recognition. Recognized cards land on the table flagged as unconfirmed; the user corrects or confirms every one. Enter chip and betting details manually. Unconfirmed or unresolved cards block analysis. An unknown opponent hand is intentional and gets its own model.
+- **Results.** Show best five-card hand when available, win/tie/loss, split-adjusted showdown equity, analysis method and sample size, legal actions with chip costs and sizing, and an explanation of what the assumptions support. Any input edit invalidates the old result.
+
+## Rules and state
+
+A versioned snapshot carries a ruleset ID, board, hero and optional opponent hand, pot before the hero's decision, both remaining stacks, hero street commitment, amount faced, and last full raise increment or minimum opening bet. Chip amounts are integers. The heads-up starter assumes action is on the hero and raising rights are open when both players have chips. The amount faced is the difference between opponent and hero street commitments. The pot includes current wagers. This is a decision snapshot with no hand history or transition engine.
+
+The plugin owns deck composition, card counts, validation, showdown ranking, action generation, and the study recommendation. Shared equity code uses the plugin deck and evaluator. A future plugin can supply other card counts and ranking policies. The starter contract supports a single high-hand winner or split among equal ranks and a community board. Extend the contract and add cross-variant fixtures before supporting stud, hi-lo, or multiple boards. Register trusted plugins in source and pin IDs to saved schema versions.
+
+Hold’em selects the best five of the available cards. Check or fold/call are determined from the wager; full bets or raises respect the configured minimum, and a smaller aggressive action requires the hero’s entire stack. An already all-in opponent cannot face another wager heads-up. Raise ranges are total street commitment. Full street replay, forced posts, reopening after short raises in multiway play, uncalled-chip settlement across streets, side pots, rake, and tournament ICM are later work. Use the [Poker TDA rules](https://www.pokertda.com/view-poker-tda-rules/) as a reference for raise increments and reopening when adding replay. Treat house policies separately.
+
+## Equity and recommendations
+
+Assume a fixed revealed opponent hand or uniform draws from the remaining deck. Enumerate up to 3,000 distinct outcomes. For larger spaces, run 2,500 seeded trials and draw without replacement within each trial. Report equity as wins plus half of ties. For samples, show a conservative 95% Hoeffding sampling bound clipped to [0, 1]. Range-model uncertainty is separate and is not captured by the bound.
+
+For a river call or a call that puts one player all-in, compare expected call value with folding, after removing any unmatched excess from the pot. Also show the break-even equity threshold. When the sampling interval overlaps the threshold, report an inconclusive result. Earlier calls with future betting show pot odds and withhold a recommendation. With no wager, show check as the baseline and withhold a betting preference until a response model exists. The call comparison does not rank raises, and the starter is not a solver. Later add weighted ranges, sensitivity analysis, and assumption-driven EV for candidate bet sizes.
+
+## Vision and privacy
+
+Keep pixels in browser memory and clear the preview on request, on replacement, and on closing the photo panel. Use one user-selected still, with supported raster formats and bounded file size. Keep photo bytes out of app caches, logs, telemetry, and scenario exports. No accounts.
+
+Cloud recognition is the one exception to on-device pixels, and it is opt-in per photo. Nothing leaves the device until the user presses **Read cards with Claude** next to a notice that names the destination. The browser re-encodes the still as a JPEG of at most 1568 px on the long edge, which drops photo metadata, and posts it to the app server's same-origin `/api/recognize` endpoint. The server holds the API key, accepts only same-origin JPEG, PNG, or WebP bodies up to 5 MB, forwards the image to the Claude API (`claude-opus-5-5`, structured JSON output), and returns per-row card codes with high, medium, or low labels. The server keeps the image in memory for the request only and never logs or stores it. Anthropic's API data retention applies to the forwarded image. Without a configured key, or on a static host with no endpoint, the app reports recognition as unavailable and manual card entry still works. The on-device adapter remains available for a future local recognizer.
+
+Recognition emits per-slot candidate cards with confidence labels, a model ID, unknown slots, and plain-language issues. The labels are the model's own and are not probabilities. Before showing any score as probability, calibrate on held-out photos grouped by deck and capture session. Choose acceptance thresholds from a measured false-accept target, including a margin between the top two candidates. Abstain on glare, occlusion, unsupported layout or deck, and ambiguous rank or suit. Flag duplicate candidates across slots. Every imported slot requires user confirmation, including high-scoring ones. Never infer hidden cards, bet sizes, turn order, or positions from the image; rows map to seats only by the user's stated layout. Report visual confidence separately from sampling uncertainty and strategy model assumptions.
+
+## Platform and interface
+
+Use strict TypeScript, standard browser APIs, a static HTML/CSS interface, and a worker for equity. One client serves desktop and phone. A manifest and service worker provide the offline shell after a successful first load on a secure origin. Use localhost for development and HTTPS for installation on a phone. Photo capture support varies, so retain a regular file picker. Revisit a native wrapper only if device testing identifies a concrete camera, inference, or installation gap.
+
+Use a two-column workspace on desktop, with the table editor above the results on narrow screens. The table shows the opponent seat, board, pot, and hero seat; card slots open an accessible card picker that disables cards already in use. Use labeled inputs, visible keyboard focus, accessible status messages, large targets, and text for all confidence states. Use local assets and system fonts. Release testing covers keyboard, screen readers, phone layout, and offline reload.
+
+References for the platform design include [PWA installation](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Guides/Making_PWAs_installable), [service worker requirements](https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API/Using_Service_Workers), and [photo input compatibility](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Attributes/capture).

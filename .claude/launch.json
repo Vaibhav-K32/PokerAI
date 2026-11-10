@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "poker-study",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["scripts/serve.mjs"],
+      "port": 4173
+    }
+  ]
+}

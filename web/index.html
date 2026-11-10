@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#102624">
+  <meta name="description" content="A study table for simulated poker and completed hands.">
+  <title>Poker Study · Hold’em Lab</title>
+  <link rel="stylesheet" href="./style.css">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon-192.png">
+  <link rel="apple-touch-icon" href="./icon-192.png">
+  <script type="module" src="./web/main.js"></script>
+</head>
+<body>
+  <header class="masthead">
+    <div class="wrap top">
+      <div class="brand"><span aria-hidden="true">♠</span> POKER STUDY</div>
+      <span class="badge">HEADS-UP HOLD’EM</span>
+    </div>
+    <div class="wrap intro">
+      <h1>Study the decision.</h1>
+      <p>Set up a simulated spot or reconstruct a completed hand on the table. Tap a card slot to pick a card, or scan a photo of the cards.</p>
+    </div>
+  </header>
+  <main class="wrap workspace">
+    <section class="panel table-panel" aria-labelledby="table-title">
+      <div class="heading">
+        <h2 id="table-title">Table</h2>
+        <div class="actions">
+          <button type="button" id="load-example" class="secondary">Load example</button>
+          <button type="button" id="reset-table" class="secondary">Clear table</button>
+        </div>
+      </div>
+      <form id="scenario" autocomplete="off">
+        <div class="felt" role="group" aria-label="Poker table">
+          <div class="seat seat-opponent">
+            <p class="seat-name">Opponent <small>cards optional</small></p>
+            <div class="cards" id="opponent-cards"></div>
+            <label class="chip-field">Stack behind<input id="opponent-stack" type="number" inputmode="numeric" min="0" step="1" required></label>
+          </div>
+          <label class="chip-field bet">To call<input id="faced" type="number" inputmode="numeric" min="0" step="1" value="0" required></label>
+          <div class="center">
+            <div class="cards board" id="board-cards"></div>
+            <label class="chip-field pot">Pot, including current bets<input id="pot" type="number" inputmode="numeric" min="0" step="1" required></label>
+          </div>
+          <label class="chip-field bet">Your bet this street<input id="committed" type="number" inputmode="numeric" min="0" step="1" value="0" required></label>
+          <div class="seat seat-hero">
+            <div class="cards" id="hero-cards"></div>
+            <p class="seat-name">You</p>
+            <label class="chip-field">Stack behind<input id="hero-stack" type="number" inputmode="numeric" min="1" step="1" required></label>
+          </div>
+        </div>
+
+        <div class="fields controls">
+          <label>Study context
+            <select id="purpose" required>
+              <option value="">Choose a context</option>
+              <option value="simulation">Simulated hand</option>
+              <option value="completed">Completed hand</option>
+            </select>
+          </label>
+          <label>Minimum bet / last full raise<input id="increment" type="number" inputmode="numeric" min="1" step="1" required></label>
+        </div>
+
+        <details id="photo-panel">
+          <summary>Scan a photo of the cards</summary>
+          <p>Lay the cards face-up in three rows: the opponent’s cards farthest away, the board in the middle, and your cards nearest the camera. Chips and bets are not read; enter them on the table.</p>
+          <div class="fields">
+            <label>Choose a photo<input type="file" id="photo-file" accept="image/jpeg,image/png,image/webp"></label>
+            <label>Take a photo, if supported<input type="file" id="photo-camera" accept="image/jpeg,image/png,image/webp" capture="environment"></label>
+          </div>
+          <img id="photo-preview" alt="Selected photo of the cards" hidden>
+          <p class="consent">Reading the cards sends a resized copy of this photo to Anthropic’s Claude API through this app’s server. Nothing is sent until you press <strong>Read cards with Claude</strong>.</p>
+          <div class="actions">
+            <button type="button" id="recognize" disabled>Read cards with Claude</button>
+            <button type="button" id="clear-photo" class="secondary">Clear photo</button>
+          </div>
+          <p id="photo-status" role="status">Choose one photo of the cards.</p>
+          <ul id="photo-issues" hidden></ul>
+        </details>
+
+        <div id="confirm-bar" class="confirm-bar" hidden>
+          <p id="confirm-text"></p>
+          <button type="button" id="confirm-all" class="secondary">All cards match the photo</button>
+        </div>
+
+        <button id="analyze" type="submit">Analyze hand <span aria-hidden="true">↗</span></button>
+        <p id="status" role="status"></p>
+      </form>
+    </section>
+    <section class="panel results" aria-labelledby="result-title">
+      <h2 id="result-title">Study results</h2>
+      <div id="result-empty" class="empty">
+        <span aria-hidden="true">♠</span>
+        <p>Load an example or set up a hand to see equity, legal actions, and a decision breakdown.</p>
+      </div>
+      <div id="result-body"></div>
+    </section>
+  </main>
+
+  <dialog id="picker" aria-labelledby="picker-title">
+    <form method="dialog">
+      <h2 id="picker-title">Choose a card</h2>
+      <p id="picker-note"></p>
+      <div id="picker-grid" class="picker-grid"></div>
+      <div class="actions">
+        <button type="submit" value="confirm" id="picker-confirm" hidden>Keep this card</button>
+        <button type="submit" value="clear" class="secondary">Empty this slot</button>
+        <button type="submit" value="cancel" class="secondary">Cancel</button>
+      </div>
+    </form>
+  </dialog>
+
+  <footer class="wrap">Heads-up no-limit Hold’em · For simulation and post-hand review <span id="offline-status"></span></footer>
+</body>
+</html>
