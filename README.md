@@ -31,6 +31,12 @@ Run `npm run check` for TypeScript compilation, build, and automated core tests.
 
 Select **Hand replay** at the top of the page, then **Load demo hand**. It is a four-handed hand with blinds, betting on every street, a showdown, and the pot award, using fictional players. Step through it with the first, previous, play/pause, next, and last buttons, the speed menu, or the timeline slider. You can also click any event in the list. **Analyze this decision** sends the current decision to the study table. Saved hands stay in this browser. Each hand can be renamed, exported as JSON, imported again, or deleted. See [the engine reference](src/history/HISTORY.md) for the event format, rules, and how recognition modules can plug in later.
 
+### Import a screenshot
+
+Select **Import screenshot**, then drop a PNG, JPEG, or WebP screenshot of a digital table from a simulated or finished hand (up to 12 MB), or choose a file. To try it without an API key, pick one of the built-in samples. Press **Read table**. Real screenshots go to Claude through the app server, so set `ANTHROPIC_API_KEY` as described above; samples use stored results and never call the API. You can cancel while it reads, and a failed scan leaves the study table as it was.
+
+The review screen shows the screenshot (with zoom) beside every recognized field: seats, names, stacks, bets, folded status, hole cards, board, pot, blinds, dealer, and street. Each field is marked High confidence, Needs review, Unknown, or Conflict. Click any card to fix it with the card picker, or mark it unknown. Edit any number, and mark your seat and the dealer. Problems such as duplicate cards or an impossible board block importing until they are fixed. Then choose **Load into study table**, **Save for later** (the image is kept only if you tick the box), or **Attach to hand** to link it to a saved hand it matches, and **Open in hand review**. Details and limits: [src/vision/SCREENSHOTS.md](src/vision/SCREENSHOTS.md).
+
 ## Phone and offline use
 
 For a phone trial, serve `dist/` from an HTTPS static origin the phone can reach. First load it while connected and give the service worker time to cache the app before checking an offline reload. Use your browser’s install or home screen option if available. The file picker works as the fallback on browsers that do not support direct photo capture. The local development server listens on loopback by default. A static host has no `/api/recognize` endpoint, so photo recognition works only through `npm start` (or another server that mounts `scripts/recognize.mjs`); browsers allow camera capture on a phone only over HTTPS.
@@ -40,6 +46,6 @@ For a phone trial, serve `dist/` from an HTTPS static origin the phone can reach
 - [Specification](SPEC.md) covers product boundaries, data contracts, decision assumptions, and capture privacy.
 - [Implementation plan](PLAN.md) covers milestones, the test matrix, and the next work item.
 - [Repository instructions](AGENTS.md) and [Claude Code entry point](CLAUDE.md) define how to divide and review tasks.
-- `src/core/` holds state, the plugin registry, and equity. `src/rules/` holds Hold’em rules. `src/history/` holds the hand history and replay engine (pure, no browser APIs). `src/vision/` holds the recognition contract and the cloud recognizer client. `scripts/recognize.mjs` is the server-side Claude API endpoint. `src/web/` and `web/` hold the table interface and worker entry points.
+- `src/core/` holds state, the plugin registry, and equity. `src/rules/` holds Hold’em rules. `src/history/` holds the hand history and replay engine (pure, no browser APIs). `src/vision/` holds the photo and screenshot recognition contracts, providers, review checks, and synthetic screenshot fixtures. `scripts/recognize.mjs` is the server-side Claude API endpoint. `src/web/` and `web/` hold the table interface and worker entry points.
 
 The folder is ready to put under Git. Start each coding agent from this directory so it picks up the project instructions.

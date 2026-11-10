@@ -21,6 +21,8 @@
 
 M1 rules and replay: the event-driven hand history engine (`src/history/`) replays 2–10 player hands with antes, side pots, uncalled returns, and split pots. It has a demo hand, heads-up, side-pot, and split-pot fixtures, JSON import and export with validation, and a read-only replay view. Remaining M1 work: a form for recording a new hand event by event, and retiring the older heads-up reducer in `src/rules/holdem-replay.ts` once nothing depends on it.
 
+Screenshot import: digital screenshots are read through the Claude endpoint (`layout=screenshot`) behind a provider interface. Users review and correct every field before loading into the study table, saving, or attaching to a matching saved hand. Six synthetic SVG fixtures drive deterministic tests and in-app samples. Next: measure recognition accuracy on a labeled set of consented practice-client screenshots, and add card-region coordinates to highlight detections.
+
 ## Suggested next work item
 
 Add a hand recorder that builds events through `actionOptions` and `validateCandidate`, so manual entry and later recognition share one path. Then let a screenshot reader propose board and action candidates from a controlled digital layout for user confirmation, measured against labeled fixtures. Follow with weighted range support.

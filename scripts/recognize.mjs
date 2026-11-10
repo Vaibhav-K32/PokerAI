@@ -44,6 +44,71 @@ Card codes are a rank from 2 3 4 5 6 7 8 9 T J Q K A followed by a suit letter: 
 
 Report only cards that are face-up and visible. Leave out face-down cards, card backs, and empty positions; do not guess hidden cards. When a face-up card is visible but you cannot read both rank and suit with certainty (glare, blur, occlusion, angle), report it as "unknown". Use "high" confidence only when both the rank and the suit indices are clearly legible. Ignore chips, hands, and other objects; never estimate bets or positions. Never report more than three opponents or more than two cards for one opponent. If the layout does not match the three rows, assign cards as best you can and describe the problem in issues. Put short, plain-language notes about glare, blur, cropping, layout, or duplicate-looking cards in issues, or leave it empty.`;
 
+// ---------------------------------------------------------------------------
+// Screenshot layout: a digital table from a simulated or completed hand.
+// ---------------------------------------------------------------------------
+const confidence = { type: 'string', enum: ['high', 'medium', 'low', 'none'] };
+const nullable = schema => ({ anyOf: [schema, { type: 'null' }] });
+const field = value => ({
+  type: 'object', additionalProperties: false, required: ['value', 'confidence'],
+  properties: { value, confidence },
+});
+const screenCard = {
+  type: 'object', additionalProperties: false, required: ['card', 'confidence'],
+  properties: { card: { type: 'string', enum: [...CARD_CODES, 'unknown', 'hidden'] }, confidence },
+};
+const screenSeat = {
+  type: 'object', additionalProperties: false,
+  required: ['name', 'stack', 'bet', 'status', 'cards'],
+  properties: {
+    name: field(nullable({ type: 'string' })),
+    stack: field(nullable({ type: 'integer' })),
+    bet: field(nullable({ type: 'integer' })),
+    status: field({ type: 'string', enum: ['active', 'folded', 'unknown'] }),
+    cards: { type: 'array', items: screenCard },
+  },
+};
+export const SCREENSHOT_SCHEMA = {
+  type: 'object', additionalProperties: false,
+  required: ['players', 'board', 'pot', 'smallBlind', 'bigBlind', 'dealerSeat', 'heroSeat', 'street', 'issues'],
+  properties: {
+    players: { type: 'array', items: screenSeat },
+    board: { type: 'array', items: screenCard },
+    pot: field(nullable({ type: 'integer' })),
+    smallBlind: field(nullable({ type: 'integer' })),
+    bigBlind: field(nullable({ type: 'integer' })),
+    // Indexes into players.
+    dealerSeat: field(nullable({ type: 'integer' })),
+    heroSeat: field(nullable({ type: 'integer' })),
+    street: field(nullable({ type: 'string', enum: ['preflop', 'flop', 'turn', 'river'] })),
+    issues: { type: 'array', items: { type: 'string' } },
+  },
+};
+
+const SCREENSHOT_SYSTEM = `You read one screenshot of a digital Texas Hold'em table for an offline poker study app. The hand is simulated or already finished. The user reviews and corrects everything you report, so report only what you can see; accuracy matters more than completeness.
+
+Players: list every visible seat in clockwise order, starting with the seat at the bottom center of the table (usually the user's own seat) and continuing to its left. For each seat report:
+- name: the player label if legible, else null
+- stack: the chip count shown for that seat as a whole number (strip commas and currency symbols; if the stack is shown only in big blinds or is unreadable, use null)
+- bet: chips in front of the seat for the current betting round as a whole number, 0 only when the seat clearly has no bet in front, null when you cannot tell
+- status: "folded" when the seat is clearly out of the hand (greyed out, a Fold label, no cards while others have cards), "active" when clearly still in, otherwise "unknown"
+- cards: the seat's hole cards. Use the card code when face-up and readable, "unknown" when face-up but not readable, "hidden" for a face-down card back, and an empty list when the seat shows no cards at all.
+
+Board: the community cards left to right (0 to 5). Pot: the total pot number displayed in the middle, else null. Blinds: only if displayed as text, else null. dealerSeat and heroSeat: indexes into your players list for the seat with the dealer button and for the user's own seat (face-up hole cards at the bottom), else null. Street: only if the screen states it in text; otherwise null.
+
+Card codes are a rank from 2 3 4 5 6 7 8 9 T J Q K A followed by a suit letter: c clubs, d diamonds, h hearts, s spades. A ten is T.
+
+For every field give a confidence: "high" only when it is clearly legible, "medium" or "low" when you are unsure, and "none" when the value is null. Never compute, estimate, or infer a value from game rules or other fields; report null instead. Never advise on play. Put short notes about cropping, overlapping elements, unreadable text, or unusual layouts in issues.`;
+
+/** Prompt and schema for each supported layout. */
+export const LAYOUTS = {
+  cards: { system: SYSTEM, schema: RESULT_SCHEMA, prompt: 'Transcribe the face-up cards in this photo by row.' },
+  screenshot: { system: SCREENSHOT_SYSTEM, schema: SCREENSHOT_SCHEMA, prompt: 'Read the table state shown in this screenshot.' },
+};
+
+/** Upper bound for one recognition request. */
+export const REQUEST_TIMEOUT_MS = 90_000;
+
 function send(response, status, body) {
   response.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' })
     .end(JSON.stringify(body));
@@ -72,19 +137,20 @@ async function readBody(request, limit) {
 }
 
 /** Build the Messages API request for one image. Exported for tests. */
-export function buildRequest(image, mediaType, model = MODEL) {
+export function buildRequest(image, mediaType, model = MODEL, layout = 'cards') {
+  const { system, schema, prompt } = LAYOUTS[layout];
   return {
     model,
     max_tokens: 16000,
     betas: ['server-side-fallback-2026-07-01'],
     fallbacks: 'default',
-    output_config: { effort: 'medium', format: { type: 'json_schema', schema: RESULT_SCHEMA } },
-    system: SYSTEM,
+    output_config: { effort: 'medium', format: { type: 'json_schema', schema } },
+    system,
     messages: [{
       role: 'user',
       content: [
         { type: 'image', source: { type: 'base64', media_type: mediaType, data: image.toString('base64') } },
-        { type: 'text', text: 'Transcribe the face-up cards in this photo by row.' },
+        { type: 'text', text: prompt },
       ],
     }],
   };
@@ -103,6 +169,11 @@ export function createRecognizeHandler({ getClient = () => new Anthropic(), mode
     }
     if (!sameOrigin(request)) {
       send(response, 403, { error: 'Recognition requests must come from this app.' });
+      return;
+    }
+    const layout = new URL(request.url ?? '/', 'http://localhost').searchParams.get('layout') ?? 'cards';
+    if (!Object.hasOwn(LAYOUTS, layout)) {
+      send(response, 400, { error: 'Unknown recognition layout.' });
       return;
     }
     const mediaType = (request.headers['content-type'] ?? '').split(';')[0].trim();
@@ -129,9 +200,11 @@ export function createRecognizeHandler({ getClient = () => new Anthropic(), mode
 
     let message;
     try {
-      message = await client.beta.messages.create(buildRequest(image, mediaType, model));
+      message = await client.beta.messages.create(buildRequest(image, mediaType, model, layout), { timeout: REQUEST_TIMEOUT_MS });
     } catch (error) {
-      if (error instanceof Anthropic.AuthenticationError || error instanceof Anthropic.PermissionDeniedError) {
+      if (error instanceof Anthropic.APIConnectionTimeoutError) {
+        send(response, 504, { error: 'Recognition took too long. Try again, or try a smaller screenshot.' });
+      } else if (error instanceof Anthropic.AuthenticationError || error instanceof Anthropic.PermissionDeniedError) {
         send(response, 503, { error: 'The Claude API key was rejected. Check ANTHROPIC_API_KEY on the server.' });
       } else if (error instanceof Anthropic.RateLimitError) {
         send(response, 429, { error: 'The Claude API is rate limited. Try again in a moment.' });
@@ -155,7 +228,8 @@ export function createRecognizeHandler({ getClient = () => new Anthropic(), mode
       return;
     }
     try {
-      send(response, 200, { modelId: message.model, result: JSON.parse(text) });
+      // The photo layout keeps its original response shape.
+      send(response, 200, { modelId: message.model, ...(layout === 'cards' ? {} : { layout }), result: JSON.parse(text) });
     } catch {
       send(response, 502, { error: 'Claude returned an unreadable answer. Try again.' });
     }

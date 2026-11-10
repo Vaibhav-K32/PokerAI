@@ -35,9 +35,16 @@ function deepFreeze<T>(value: T): T {
   return value;
 }
 
-export function initReplay(options: { onAnalyze: (snapshot: Snapshot) => void }) {
-  const studyView = element('study-view');
-  const replayView = element('replay-view');
+export interface ReplayController {
+  showView(view: 'study' | 'replay' | 'screenshot'): void;
+  /** Reload saved hands from storage and redraw the list. */
+  reloadHands(): void;
+  /** Open a saved hand at a replay position and show the replay view. */
+  openHand(handId: string, position: number): boolean;
+}
+
+export function initReplay(options: { onAnalyze: (snapshot: Snapshot) => void; onLeaveScreenshot?: () => void }): ReplayController {
+  const views = ['study', 'replay', 'screenshot'] as const;
   const tabs = [...document.querySelectorAll<HTMLButtonElement>('.view-tab')];
   const status = element('history-status');
   const list = element('hand-list');
@@ -58,10 +65,9 @@ export function initReplay(options: { onAnalyze: (snapshot: Snapshot) => void })
   // Views
   // -------------------------------------------------------------------------
   function showView(view: string) {
-    const replay = view === 'replay';
-    if (!replay) pause();
-    studyView.hidden = replay;
-    replayView.hidden = !replay;
+    if (view !== 'replay') pause();
+    if (view !== 'screenshot') options.onLeaveScreenshot?.();
+    for (const name of views) element(name + '-view').hidden = name !== view;
     for (const tab of tabs) {
       if (tab.dataset.view === view) tab.setAttribute('aria-current', 'page');
       else tab.removeAttribute('aria-current');
@@ -216,6 +222,7 @@ export function initReplay(options: { onAnalyze: (snapshot: Snapshot) => void })
     element('replay-meta').textContent = frozen.playerCount + ' players · blinds ' + setup.smallBlind + '/' + setup.bigBlind
       + (setup.ante ? ' · ante ' + setup.ante : '') + ' · ' + frozen.events.length + ' events · ' + frozen.result.status;
     scrub.max = String(frozen.events.length);
+    renderAttachments();
     renderTimeline();
     go(at);
     renderList();
@@ -228,6 +235,23 @@ export function initReplay(options: { onAnalyze: (snapshot: Snapshot) => void })
     analyzeButton.hidden = true;
     element('replay-title').textContent = 'Hand replay';
     element('replay-meta').textContent = 'Load the demo hand or open a saved hand.';
+  }
+
+  function renderAttachments() {
+    const box = element('replay-attachments');
+    box.replaceChildren();
+    const attachments = current?.history.attachments ?? [];
+    box.hidden = !attachments.length;
+    if (!attachments.length || !current) return;
+    add(box, 'h3', 'Attached screenshots');
+    const items = add(box, 'ul', '', 'attachment-list');
+    for (const a of attachments) {
+      const item = add(items, 'li');
+      const button = add(item, 'button', a.label + ' · event ' + a.position, 'secondary') as HTMLButtonElement;
+      button.type = 'button';
+      button.addEventListener('click', () => { pause(); go(a.position); });
+      add(item, 'span', ' Observed state; it adds no events to the hand.', 'fine-print');
+    }
   }
 
   function renderTimeline() {
@@ -408,8 +432,25 @@ export function initReplay(options: { onAnalyze: (snapshot: Snapshot) => void })
   // -------------------------------------------------------------------------
   // Start
   // -------------------------------------------------------------------------
-  const loaded = loadHands();
-  hands = loaded.hands;
-  if (loaded.problems.length) status.textContent = loaded.problems.join(' ');
-  renderList();
+  function reloadHands() {
+    const loaded = loadHands();
+    hands = loaded.hands;
+    if (loaded.problems.length) status.textContent = loaded.problems.join(' ');
+    if (current && !hands.some(h => h.id === current!.history.id)) close();
+    renderList();
+  }
+  reloadHands();
+
+  return {
+    showView,
+    reloadHands,
+    openHand(handId, at) {
+      reloadHands();
+      const hand = hands.find(h => h.id === handId);
+      if (!hand) return false;
+      showView('replay');
+      open(hand, at);
+      return true;
+    },
+  };
 }

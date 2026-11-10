@@ -1,6 +1,7 @@
 // Stored hand histories: building, JSON round trips, runtime validation, and
 // schema migration. Pure TypeScript; storage lives in the web layer.
-import { applyHandEvent, buildPots, createHandState, potWinners, replayHand, splitPot } from './engine.js';
+import { applyHandEvent, buildPots, createHandState, potWinners, replayHand, replaySteps, splitPot } from './engine.js';
+import { matchObservation, type TableObservation } from './observation.js';
 import {
   HAND_SCHEMA_VERSION, HandRuleError,
   type GameState, type HandEvent, type HandEventPayloads, type HandEventType, type HandSetup,
@@ -31,6 +32,23 @@ export interface HandHistory {
   readonly events: readonly HandEvent[];
   readonly result: HandResult;
   readonly finalState: GameState;
+  /** Observed table states (for example screenshots) linked to a replay position. */
+  readonly attachments?: readonly HandAttachment[];
+}
+
+/**
+ * An observation linked to the point in a recorded hand where it fits. The
+ * observation is evidence about one moment; it adds no events to the hand.
+ */
+export interface HandAttachment {
+  readonly id: string;
+  readonly label: string;
+  readonly attachedAt: string;
+  /** Replay position: the state after this many events. */
+  readonly position: number;
+  /** Observed seat k is the hand's seat (k + rotation) mod n. */
+  readonly rotation: number;
+  readonly observation: TableObservation;
 }
 
 export function summarize(state: GameState): HandResult {
@@ -47,10 +65,10 @@ export function summarize(state: GameState): HandResult {
 export function createHistory(
   setup: HandSetup,
   events: readonly HandEvent[],
-  meta: { name?: string; createdAt?: string } = {},
+  meta: { name?: string; createdAt?: string; attachments?: readonly HandAttachment[] } = {},
 ): HandHistory {
   const finalState = replayHand(createHandState(setup), events);
-  return {
+  const history: HandHistory = {
     kind: HISTORY_KIND,
     schemaVersion: HAND_SCHEMA_VERSION,
     id: setup.handId,
@@ -62,6 +80,34 @@ export function createHistory(
     result: summarize(finalState),
     finalState,
   };
+  if (!meta.attachments?.length) return history;
+  checkAttachments(history, meta.attachments);
+  return { ...history, attachments: meta.attachments.map(a => structuredClone(a)) };
+}
+
+/** Throw unless every attachment still fits the hand at its stored position. */
+function checkAttachments(history: HandHistory, attachments: readonly HandAttachment[]) {
+  const states = replaySteps(createHandState(history.setup), history.events);
+  const ids = new Set<string>();
+  for (const a of attachments) {
+    if (!isRecord(a) || typeof a.id !== 'string' || !a.id || ids.has(a.id)) throw new HandRuleError('Each attachment needs a unique ID.');
+    ids.add(a.id);
+    if (typeof a.label !== 'string' || typeof a.attachedAt !== 'string' || Number.isNaN(Date.parse(a.attachedAt))) {
+      throw new HandRuleError('An attachment needs a label and a time.');
+    }
+    if (!isRecord(a.observation) || !Array.isArray(a.observation.players) || !Array.isArray(a.observation.board)) {
+      throw new HandRuleError('An attachment needs an observed table state.');
+    }
+    const fits = matchObservation(states, a.observation).some(m => m.position === a.position && m.rotation === a.rotation);
+    if (!fits) throw new HandRuleError('Attachment “' + a.label + '” does not match the hand at event ' + a.position + '.');
+  }
+}
+
+/** A copy of the history with one more attachment. The original is unchanged. */
+export function withAttachment(history: HandHistory, attachment: HandAttachment): HandHistory {
+  return createHistory(history.setup, history.events, {
+    name: history.name, createdAt: history.createdAt, attachments: [...(history.attachments ?? []), attachment],
+  });
 }
 
 export function serializeHistory(history: HandHistory): string {
@@ -123,7 +169,10 @@ export function parseHistory(input: unknown): HandHistory {
   if (data.playerCount !== setup.players.length) throw new HandRuleError('The player count does not match the setup.');
   if (!Array.isArray(events)) throw new HandRuleError('The hand history needs an event list.');
 
-  const history = createHistory(setup as unknown as HandSetup, events as HandEvent[], { name: data.name, createdAt: data.createdAt });
+  if (data.attachments !== undefined && !Array.isArray(data.attachments)) throw new HandRuleError('Attachments must be a list.');
+  const history = createHistory(setup as unknown as HandSetup, events as HandEvent[], {
+    name: data.name, createdAt: data.createdAt, attachments: data.attachments as HandAttachment[] | undefined,
+  });
   if (data.finalState !== undefined && JSON.stringify(data.finalState) !== JSON.stringify(history.finalState)) {
     throw new HandRuleError('The recorded final state does not match a replay of the events.');
   }

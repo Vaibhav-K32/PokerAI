@@ -5,7 +5,10 @@ import type {
 } from '../core/types.js';
 import { explainFold } from '../core/sizing.js';
 import { cardName, rankLabel, renderCardFace, suitNames, suitSymbols } from './cards-view.js';
+import { pickCard } from './card-picker.js';
+import { prepareUpload } from './image.js';
 import { initReplay } from './replay.js';
+import { initScreenshotImport } from './screenshot-view.js';
 import { cloudRecognizer, type Confidence, type Recognition } from '../vision/recognizer.js';
 
 function element<T extends HTMLElement>(id: string): T {
@@ -95,7 +98,7 @@ function renderSlots() {
         badge.textContent = slot.duplicate ? 'dup' : slot.unreadable ? 'fix' : slot.confidence ?? 'check';
         button.append(badge);
       }
-      button.addEventListener('click', () => openPicker(group, index));
+      button.addEventListener('click', () => void openPicker(group, index));
       return button;
     }));
   }
@@ -109,70 +112,24 @@ function renderSlots() {
 // ---------------------------------------------------------------------------
 // Card picker dialog
 // ---------------------------------------------------------------------------
-const picker = element<HTMLDialogElement>('picker');
-const pickerGrid = element('picker-grid');
-const pickerConfirm = element<HTMLButtonElement>('picker-confirm');
-let picking: { group: SlotGroup; index: number; opener: HTMLElement | null } | null = null;
-
-function openPicker(group: SlotGroup, index: number) {
+async function openPicker(group: SlotGroup, index: number) {
   const current = slots[group][index];
   const used = new Set(groupsInPlay().flatMap(g => slots[g]
     .filter((slot, i) => slot.card && !(g === group && i === index))
-    .map(slot => slot.card)));
-  picking = { group, index, opener: document.activeElement as HTMLElement | null };
-  element('picker-title').textContent = slotLabel(group, index);
-  element('picker-note').textContent = current.pending
-    ? (current.card ? 'Read from the photo as ' + cardName(current.card) + '. Keep it or pick the correct card.' : 'This card could not be read from the photo. Pick the card you see.')
-    : 'Cards already on the table are unavailable.';
-  pickerConfirm.hidden = !(current.pending && current.card);
-
-  const rows = [...'shdc'].map(suit => {
-    const row = document.createElement('div');
-    row.className = 'picker-row';
-    row.setAttribute('role', 'group');
-    row.setAttribute('aria-label', suitNames[suit]);
-    for (const card of standardDeck.filter(c => c[1] === suit).reverse()) {
-      const button = document.createElement('button');
-      button.type = 'submit';
-      button.value = 'card:' + card;
-      button.className = 'pick';
-      button.setAttribute('aria-label', cardName(card) + (used.has(card) ? ', already on the table' : ''));
-      button.disabled = used.has(card);
-      if (card === current.card) button.setAttribute('aria-pressed', 'true');
-      renderCardFace(button, card);
-      row.append(button);
-    }
-    return row;
+    .map(slot => slot.card!)));
+  const result = await pickCard({
+    title: slotLabel(group, index),
+    note: current.pending
+      ? (current.card ? 'Read from the photo as ' + cardName(current.card) + '. Keep it or pick the correct card.' : 'This card could not be read from the photo. Pick the card you see.')
+      : 'Cards already on the table are unavailable.',
+    current: current.card,
+    used,
+    canConfirm: current.pending && !!current.card,
   });
-  pickerGrid.replaceChildren(...rows);
-  picker.returnValue = '';
-  picker.showModal();
-  (pickerGrid.querySelector<HTMLButtonElement>('[aria-pressed=true]')
-    ?? pickerGrid.querySelector<HTMLButtonElement>('button:not(:disabled)'))?.focus();
-}
-
-// Apply the choice on submit, which runs synchronously, rather than waiting for
-// the dialog's close event; `close` only covers Escape and other dismissals.
-picker.querySelector('form')?.addEventListener('submit', event => {
-  finishPick((event.submitter as HTMLButtonElement | null)?.value ?? 'cancel');
-});
-picker.addEventListener('close', () => finishPick(picker.returnValue || 'cancel'));
-
-function finishPick(value: string) {
-  if (!picking) return;
-  const { group, index, opener } = picking;
-  picking = null;
-  const slot = slots[group][index];
-  if (value.startsWith('card:')) {
-    slots[group][index] = { card: value.slice(5), pending: false };
-  } else if (value === 'clear') {
-    slots[group][index] = { card: null, pending: false };
-  } else if (value === 'confirm') {
-    slots[group][index] = { card: slot.card, pending: false };
-  } else {
-    opener?.focus();
-    return;
-  }
+  if (result.kind === 'cancel') return;
+  if (result.kind === 'card') slots[group][index] = { card: result.card, pending: false };
+  else if (result.kind === 'clear') slots[group][index] = { card: null, pending: false };
+  else slots[group][index] = { card: current.card, pending: false };
   refreshDuplicates();
   invalidate();
   renderSlots();
@@ -821,25 +778,6 @@ async function choosePhoto(input: HTMLInputElement) {
   }
 }
 
-/** Downscale to the API's recommended size and strip metadata by re-encoding. */
-async function prepareUpload(image: Blob): Promise<Blob> {
-  const bitmap = await createImageBitmap(image, { imageOrientation: 'from-image' });
-  const scale = Math.min(1, 1568 / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.round(bitmap.width * scale);
-  canvas.height = Math.round(bitmap.height * scale);
-  canvas.getContext('2d')?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  bitmap.close();
-  try {
-    return await new Promise((resolve, reject) => canvas.toBlob(
-      blob => (blob ? resolve(blob) : reject(new Error('Could not prepare the photo.'))), 'image/jpeg', 0.9,
-    ));
-  } finally {
-    canvas.width = 0;
-    canvas.height = 0;
-  }
-}
-
 function applyRecognition(recognition: Extract<Recognition, { kind: 'observations' }>) {
   slots = emptySlots();
   // Seat as many opponents as the photo shows; never fewer than one.
@@ -927,11 +865,13 @@ function loadSnapshot(s: Snapshot) {
   });
   invalidate();
   renderSlots();
-  status.textContent = 'Loaded a decision from the hand replay. Select Analyze hand.';
+  status.textContent = 'Loaded a decision onto the table. Choose the study context if needed, then select Analyze hand.';
   element('table-title').scrollIntoView({ block: 'start' });
 }
 
-initReplay({ onAnalyze: loadSnapshot });
+let screenshotImport: { leave(): void } | null = null;
+const replay = initReplay({ onAnalyze: loadSnapshot, onLeaveScreenshot: () => screenshotImport?.leave() });
+screenshotImport = initScreenshotImport({ loadIntoTable: loadSnapshot, replay });
 
 if (window.isSecureContext && 'serviceWorker' in navigator) {
   // When a newer build takes control, reload once so the page runs it. Skip the
