@@ -4,16 +4,19 @@ const files = __FILES__;
 const index = new URL('./index.html', self.registration.scope).href;
 const assets = new Set(files.map(file => new URL(file, self.registration.scope).href));
 
+// A new build takes over as soon as it has cached its files, instead of
+// waiting for every open tab to close. The page reloads once when it does.
 self.addEventListener('install', event => {
-  event.waitUntil(caches.open(cacheName).then(cache =>
-    cache.addAll(files.map(file => new Request(file, { cache: 'reload' }))),
-  ));
+  event.waitUntil(caches.open(cacheName)
+    .then(cache => cache.addAll(files.map(file => new Request(file, { cache: 'reload' }))))
+    .then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', event => {
   event.waitUntil(caches.keys().then(names => Promise.all(names
     .filter(name => name.startsWith(prefix) && name !== cacheName)
-    .map(name => caches.delete(name)))));
+    .map(name => caches.delete(name))))
+    .then(() => self.clients.claim()));
 });
 
 self.addEventListener('fetch', event => {

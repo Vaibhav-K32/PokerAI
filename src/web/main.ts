@@ -566,7 +566,16 @@ window.addEventListener('pagehide', clearPhoto);
 renderSlots();
 
 if (window.isSecureContext && 'serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js').catch(() => {
+  // When a newer build takes control, reload once so the page runs it. Skip the
+  // first install, when there was no previous worker and the page is current.
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || reloading) return;
+    reloading = true;
+    location.reload();
+  });
+  navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).catch(() => {
     element('offline-status').textContent = 'Offline setup is unavailable in this browser session.';
   });
 }
