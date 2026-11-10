@@ -146,7 +146,7 @@ function legalActions(s: Snapshot): Action[] {
 
 function study(s: Snapshot, e: Equity): StudyNote {
   if (!s.faced) {
-    return { title: 'Check is the baseline', detail: 'A bet comparison needs assumptions about how the opponent responds.' };
+    return { title: 'Check is the baseline', detail: 'Bet sizing compares checking with bets under a stated opponent model.' };
   }
   const cost = Math.min(s.faced, s.heroStack);
   const eligiblePot = s.pot - (s.faced - cost);

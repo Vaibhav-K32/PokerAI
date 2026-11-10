@@ -106,6 +106,38 @@ export interface Outlook {
   suggestion: Suggestion;
 }
 
+/** How the modeled opponent responds to a bet: folds less, at the balanced rate, or more. */
+export type OpponentStyle = 'loose' | 'balanced' | 'tight';
+
+export interface BetOption {
+  kind: 'check' | 'fold' | 'call' | 'bet' | 'raise';
+  /** Total street commitment after the action. */
+  to: number;
+  /** Chips the hero adds now. */
+  put: number;
+  /** Modeled chance the opponent folds to this action. */
+  foldChance: number;
+  /** Hero showdown share against the hands that continue. */
+  equityWhenCalled: number;
+  /** Expected chips the hero gains from here, assuming no later betting. Fold is 0. */
+  ev: number;
+  /** The hero commits every remaining chip. */
+  allIn?: boolean;
+  /** The opponent must call all of their remaining chips. */
+  coversOpponent?: boolean;
+}
+
+export interface BetAdvice {
+  byStyle: Record<OpponentStyle, { options: readonly BetOption[]; best: number }>;
+  /** True when using one style's best action against another costs over 2% of the pot. */
+  sensitive: boolean;
+  opponent: 'known' | 'random';
+  /** Opponent holdings in the modeled range. */
+  holdings: number;
+  /** Board cards still to come; the model assumes no betting on them. */
+  streetsLeft: number;
+}
+
 export interface StudyNote {
   title: string;
   detail: string;

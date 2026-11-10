@@ -1,6 +1,8 @@
 import { standardDeck } from '../core/cards.js';
 import type { analyze } from '../core/analyze.js';
-import type { Action, Card, Outlook, OutlookRow, Snapshot } from '../core/types.js';
+import type {
+  Action, BetAdvice, BetOption, Card, OpponentStyle, Outlook, OutlookRow, Snapshot,
+} from '../core/types.js';
 import { cloudRecognizer, type Confidence, type Recognition, type SlotGroup } from '../vision/recognizer.js';
 
 function element<T extends HTMLElement>(id: string): T {
@@ -466,6 +468,128 @@ function opponentPanel(outlook: Outlook) {
   return details;
 }
 
+// ---------------------------------------------------------------------------
+// Bet sizing
+// ---------------------------------------------------------------------------
+const styleLabels: Record<OpponentStyle, string> = { loose: 'Calls too much', balanced: 'Balanced', tight: 'Folds too much' };
+let opponentStyle: OpponentStyle = 'balanced';
+try {
+  const saved = localStorage.getItem('poker-study:opponent-style');
+  if (saved === 'loose' || saved === 'balanced' || saved === 'tight') opponentStyle = saved;
+} catch {
+  // Storage can be unavailable; keep the default.
+}
+
+const chips = (value: number) => (value === 1 ? '1 chip' : value.toLocaleString() + ' chips');
+const signed = (value: number) => (value >= 0 ? '+' : '−') + Math.abs(value).toFixed(1);
+
+function describeOption(option: BetOption) {
+  switch (option.kind) {
+    case 'check': return 'Check';
+    case 'fold': return 'Fold';
+    case 'call': return 'Call ' + chips(option.put);
+    default: {
+      const verb = option.kind === 'bet' ? 'Bet ' + chips(option.put) : 'Raise to ' + chips(option.to);
+      return verb + (option.allIn ? ' (all-in)' : option.coversOpponent ? ' (puts them all-in)' : '');
+    }
+  }
+}
+
+function showSizing(advice: BetAdvice) {
+  add(results, 'h3', 'Bet sizing');
+  const section = document.createElement('div');
+  section.className = 'sizing';
+  results.append(section);
+
+  const picker = document.createElement('fieldset');
+  picker.className = 'style-picker';
+  add(picker, 'legend', 'Opponent style');
+  const render = () => renderSizing(body, advice);
+  for (const style of ['loose', 'balanced', 'tight'] as const) {
+    const label = document.createElement('label');
+    const input = document.createElement('input');
+    input.type = 'radio';
+    input.name = 'opponent-style';
+    input.value = style;
+    input.checked = style === opponentStyle;
+    input.addEventListener('change', () => {
+      opponentStyle = style;
+      try { localStorage.setItem('poker-study:opponent-style', style); } catch { /* not saved */ }
+      render();
+    });
+    label.append(input, ' ' + styleLabels[style]);
+    picker.append(label);
+  }
+  // Keep style changes out of the form's input listener, which clears results.
+  picker.addEventListener('input', event => event.stopPropagation());
+  const body = document.createElement('div');
+  section.append(picker, body);
+  render();
+}
+
+function renderSizing(body: HTMLElement, advice: BetAdvice) {
+  body.replaceChildren();
+  const { options, best } = advice.byStyle[opponentStyle];
+  const baseline = options.find(o => o.kind === 'check' || o.kind === 'call');
+  const top = options[best];
+
+  const headline = document.createElement('div');
+  headline.className = 'sizing-headline';
+  add(headline, 'p', 'Suggested').className = 'eyebrow';
+  add(headline, 'p', describeOption(top)).className = 'sizing-action';
+  let reason = 'Expected ' + signed(top.ev) + ' chips from here';
+  if (baseline && top !== baseline) reason += ', versus ' + signed(baseline.ev) + ' for ' + describeOption(baseline).toLowerCase();
+  if (top.kind === 'bet' || top.kind === 'raise') {
+    reason += '. They fold ' + wholePct(top.foldChance) + '; when they call you have ' + wholePct(top.equityWhenCalled) + ' equity.';
+  } else {
+    reason += top.kind === 'check' ? '. No bet size beats checking against this opponent.' : '.';
+  }
+  add(headline, 'p', reason);
+  body.append(headline);
+
+  if (advice.sensitive) {
+    const parts = (['loose', 'balanced', 'tight'] as const).map(style => {
+      const choice = advice.byStyle[style];
+      return styleLabels[style].toLowerCase() + ': ' + describeOption(choice.options[choice.best]).toLowerCase();
+    });
+    add(body, 'p', 'Depends on the opponent — ' + parts.join('; ') + '.').className = 'sizing-warning';
+  }
+
+  const table = document.createElement('table');
+  table.className = 'sizing-table';
+  const head = table.createTHead().insertRow();
+  for (const label of ['Action', 'They fold', 'Equity if called', 'Expected']) {
+    const cell = document.createElement('th');
+    cell.scope = 'col';
+    cell.textContent = label;
+    head.append(cell);
+  }
+  const rows = table.createTBody();
+  options.forEach((option, i) => {
+    const line = rows.insertRow();
+    if (i === best) line.className = 'best';
+    const name = document.createElement('th');
+    name.scope = 'row';
+    name.textContent = describeOption(option) + (i === best ? ' ★' : '');
+    line.append(name);
+    const aggressive = option.kind === 'bet' || option.kind === 'raise';
+    line.insertCell().textContent = aggressive ? wholePct(option.foldChance) : '—';
+    line.insertCell().textContent = option.kind === 'fold' ? '—' : wholePct(option.equityWhenCalled);
+    line.insertCell().textContent = signed(option.ev);
+  });
+  body.append(table);
+
+  const notes = [
+    'Expected chips you gain from this decision on, counting what is already in the pot. The opponent ranks their possible hands by how strong they look on this board, calls with the strongest, and never re-raises.',
+    styleLabels[opponentStyle] + ': ' + (opponentStyle === 'balanced'
+      ? 'folds just often enough that a pure bluff breaks even.'
+      : opponentStyle === 'loose' ? 'folds half as often as a balanced player.' : 'folds 1.6 times as often as a balanced player.'),
+  ];
+  if (advice.streetsLeft > 0) notes.push('Later streets are treated as checked down, which tends to favor bigger bets now. Treat sizes before the river as rough.');
+  if (advice.opponent === 'known') notes.push('With known opponent cards (hindsight), that exact hand calls or folds by where it ranks in their range.');
+  add(body, 'p', notes.join(' ')).className = 'fine-print';
+}
+
 function show(result: ReturnType<typeof analyze>, scenario: Snapshot) {
   element('result-empty').hidden = true;
   const equity = result.equity;
@@ -479,6 +603,7 @@ function show(result: ReturnType<typeof analyze>, scenario: Snapshot) {
   }
   add(results, 'h3', 'Best hand so far');
   add(results, 'p', result.rank ? result.rank.name + ' · ' + result.rank.cards.join(' ') : 'Available after the flop.');
+  if (result.sizing) showSizing(result.sizing);
   if (result.outlook) {
     showOutlook(result.outlook);
   } else {

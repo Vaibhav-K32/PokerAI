@@ -177,3 +177,21 @@ footer { padding-block: 1.25rem 2rem; color: #425d55; font-size: .88rem; }
   .fields { grid-template-columns: 1fr; }
   .badge { font-size: .63rem; }
 }
+
+/* Bet sizing ------------------------------------------------------------- */
+.sizing { margin-top: .3rem; }
+.style-picker { display: flex; flex-wrap: wrap; gap: .4rem; border: 0; padding: 0; margin: .3rem 0 .6rem; }
+.style-picker legend { width: 100%; margin-bottom: .3rem; font-size: .8rem; color: #4a645d; }
+.style-picker label { display: inline-flex; align-items: center; gap: .35rem; min-height: 2.75rem; padding: 0 .75rem; border: 1px solid #d5e3ce; border-radius: 2rem; background: #f3f7ee; font-size: .85rem; cursor: pointer; }
+.style-picker label:has(input:checked) { background: #1b634b; border-color: #1b634b; color: #fff; }
+.style-picker input { accent-color: #bce78e; }
+.sizing-headline { padding: .7rem .9rem; border-radius: .8rem; background: #102624; color: #eaf4e4; }
+.sizing-headline .eyebrow { margin: 0; color: #bce78e; }
+.sizing-headline p { margin: .2rem 0; font-size: .88rem; }
+.sizing-action { font: 500 1.7rem/1.15 Georgia, serif !important; color: #fff; }
+.sizing-warning { padding: .5rem .7rem; border-radius: .6rem; background: #fff5d6; border: 1px solid #f2c94c; font-size: .85rem; }
+.sizing-table { width: 100%; border-collapse: collapse; font-size: .85rem; margin-top: .5rem; }
+.sizing-table th, .sizing-table td { padding: .4rem .3rem; border-bottom: 1px solid #e3e9e1; text-align: right; font-variant-numeric: tabular-nums; }
+.sizing-table th[scope=row], .sizing-table thead th:first-child { text-align: left; }
+.sizing-table thead th { font-size: .7rem; letter-spacing: .05em; text-transform: uppercase; color: #4a645d; }
+.sizing-table tr.best { background: #f1f7ea; font-weight: 700; }
