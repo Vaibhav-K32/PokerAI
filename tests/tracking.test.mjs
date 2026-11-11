@@ -69,7 +69,7 @@ test('video frames keep their source and real timestamp; screenshots get none', 
   assert.deepEqual([shot.source, shot.timestampMs], ['screenshot', null], 'a screenshot never gets a frame time');
   assert.deepEqual(restoreObservation(JSON.parse(JSON.stringify(fromVideo))), fromVideo);
   assert.throws(() => restoreObservation({ ...JSON.parse(JSON.stringify(shot)), timestampMs: 100 }), /only video frames/);
-  assert.throws(() => restoreObservation({ ...JSON.parse(JSON.stringify(fromVideo)), source: 'camera' }), /screenshot or a video/);
+  assert.throws(() => restoreObservation({ ...JSON.parse(JSON.stringify(fromVideo)), source: 'camera' }), /screenshot, a video frame, or a table photo/);
 });
 
 // ---------------------------------------------------------------------------

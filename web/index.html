@@ -28,6 +28,7 @@
     <button type="button" class="view-tab" data-view="replay">Hand replay</button>
     <button type="button" class="view-tab" data-view="screenshot">Import screenshot</button>
     <button type="button" class="view-tab" data-view="reconstruct">Track hand</button>
+    <button type="button" class="view-tab" data-view="physical">Scan table</button>
   </nav>
   <main class="wrap workspace" id="study-view">
     <section class="panel table-panel" aria-labelledby="table-title">
@@ -259,7 +260,13 @@
       <div class="dropzone" id="recon-drop" tabindex="0" role="group" aria-label="Screenshot drop area" aria-describedby="recon-drop-help">
         <p id="recon-drop-help">Drop up to 20 PNG, JPEG, or WebP screenshots (12 MB each) or one video (MP4, WebM, up to 500 MB) here, or</p>
         <div class="actions">
-          <label class="button secondary file-button">Choose screenshots<input type="file" id="recon-file" accept="image/png,image/jpeg,image/webp" multiple></label>
+          <label class="sample-picker">Images are
+            <select id="recon-kind">
+              <option value="screenshot">Screenshots of a digital table</option>
+              <option value="physical_photo">Photos of a physical table</option>
+            </select>
+          </label>
+          <label class="button secondary file-button">Choose images<input type="file" id="recon-file" accept="image/png,image/jpeg,image/webp" multiple></label>
           <label class="button secondary file-button">Choose a video<input type="file" id="recon-video" accept="video/mp4,video/webm,video/ogg,video/quicktime"></label>
           <label class="sample-picker">or try a sample sequence
             <select id="recon-sample">
@@ -375,6 +382,78 @@
         <button type="button" id="recon-match" class="secondary">Check against saved hands</button>
       </div>
       <div id="recon-match-result" role="status"></div>
+    </section>
+  </main>
+
+  <main class="wrap physical-workspace" id="physical-view" hidden>
+    <section class="panel" aria-labelledby="phys-title">
+      <div class="heading">
+        <h2 id="phys-title">Scan a physical table</h2>
+        <div class="actions">
+          <label class="sample-picker">Demo
+            <select id="phys-demo-select"></select>
+          </label>
+          <button type="button" id="phys-demo" class="secondary">Load physical table demo</button>
+        </div>
+      </div>
+      <p>Photograph or upload a still photo of real cards and chips from a simulated game, a demonstration, or a finished hand. The app reads the cards, groups them into the board and seats, and lets you correct everything before it is used. This is for offline study only: there is no recording and no live play advice.</p>
+      <div class="dropzone" id="phys-drop" tabindex="0" role="group" aria-label="Photo drop area" aria-describedby="phys-drop-help">
+        <p id="phys-drop-help">Drop a JPEG, PNG, or WebP photo here (up to 12 MB), or</p>
+        <div class="actions">
+          <label class="button secondary file-button">Choose a photo<input type="file" id="phys-file" accept="image/jpeg,image/png,image/webp"></label>
+          <button type="button" id="phys-camera-start" class="secondary">Use the camera</button>
+          <button type="button" id="phys-retake" class="secondary" hidden>Retake photo</button>
+        </div>
+        <p id="phys-camera-note" class="fine-print"></p>
+      </div>
+      <div class="phys-camera" id="phys-camera" hidden>
+        <video id="phys-video" playsinline muted aria-label="Camera preview"></video>
+        <div class="actions">
+          <button type="button" id="phys-capture" disabled>Capture</button>
+          <button type="button" id="phys-switch" class="secondary" hidden>Switch camera</button>
+          <button type="button" id="phys-camera-stop" class="secondary">Close camera</button>
+        </div>
+        <p id="phys-camera-status" role="status" aria-live="polite"></p>
+      </div>
+      <figure class="shot-preview" id="phys-preview-box" hidden>
+        <img id="phys-preview" alt="The photo to read">
+        <figcaption id="phys-preview-caption"></figcaption>
+      </figure>
+      <ul id="phys-quality" class="shot-warnings" aria-label="Photo quality notes" hidden></ul>
+      <p class="consent" id="phys-consent">Reading sends a resized copy of this photo to Anthropic’s Claude API through this app’s server. Nothing is sent until you press <strong>Read table</strong>, and the photo is not stored.</p>
+      <div class="actions">
+        <button type="button" id="phys-read" disabled>Read table</button>
+        <button type="button" id="phys-cancel" class="secondary" hidden>Cancel</button>
+        <button type="button" id="phys-clear" class="secondary" hidden>Remove photo</button>
+      </div>
+      <p id="phys-status" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="panel" id="phys-review" aria-labelledby="phys-review-title" hidden>
+      <div class="heading">
+        <h2 id="phys-review-title">Review the table</h2>
+      </div>
+      <div class="review-grid">
+        <div class="review-image">
+          <div class="zoom-controls phys-controls">
+            <label>Zoom <input type="range" id="phys-zoom" min="1" max="4" step="0.25" value="1"></label>
+            <span id="phys-zoom-value">100%</span>
+            <button type="button" id="phys-rotate-left" class="secondary" aria-label="Rotate the photo left">⟲</button>
+            <button type="button" id="phys-rotate-right" class="secondary" aria-label="Rotate the photo right">⟳</button>
+            <label class="checkbox"><input type="checkbox" id="phys-boxes" checked> Show approximate outlines</label>
+            <button type="button" id="phys-set-center" class="secondary">Mark table centre</button>
+          </div>
+          <p id="phys-placing" class="fine-print" role="status"></p>
+          <div class="zoom-frame phys-frame" tabindex="0" aria-label="Photo, scroll to pan when zoomed">
+            <div class="phys-stage" id="phys-stage">
+              <img id="phys-photo" alt="The photo being reviewed">
+              <div class="phys-overlay" id="phys-overlay-layer"></div>
+            </div>
+          </div>
+          <p class="fine-print">Outlines come from the reader and are approximate. Dashed orange outlines need checking. Cards without a position have no outline.</p>
+        </div>
+        <div class="review-state" id="phys-state"></div>
+      </div>
     </section>
   </main>
 

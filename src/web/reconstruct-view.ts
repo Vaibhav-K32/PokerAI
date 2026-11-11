@@ -24,7 +24,11 @@ import {
   type Checkpoint, type FrameSource, type HandObservation, type HiddenMark, type IdentityOverride, type Interval, type IntervalResolution,
   type ManualActionType, type ReconstructionResult, type ReconstructionSession, type ScreenshotEntry, type StateDifference,
 } from '../reconstruction/types.js';
-import { claudeScreenshotProvider, fixtureProvider, type ScreenshotProvider } from '../vision/providers.js';
+import { DEMO_CHIPS, drawPhysicalScene, PHYSICAL_SEQUENCE } from '../physical/fixtures.js';
+import {
+  claudePhysicalProvider, claudeScreenshotProvider, fixturePhysicalProvider, fixtureProvider, physicalAsScreenshotProvider, type ScreenshotProvider,
+} from '../vision/providers.js';
+import { loadChipConfig } from './chip-store.js';
 import { drawTable } from '../vision/screenshot-fixtures.js';
 import { seatMoveMap, type ScreenshotRecognition } from '../vision/screenshot.js';
 import { DEFAULT_INTERVAL_MS, formatVideoTime, INTERVAL_CHOICES_MS, sampleTimes, videoProblem } from '../vision/video.js';
@@ -108,6 +112,13 @@ export function initReconstruction(options: { replay: ReplayController }) {
     const option = add(sample, 'option', s.label);
     option.value = s.id;
   }
+  const physicalOption = add(sample, 'option', 'Physical table photos, preflop to turn');
+  physicalOption.value = 'physical-sequence';
+  const kindSelect = element<HTMLSelectElement>('recon-kind');
+  /** The provider for uploaded images: screenshots, or photos of a physical table using your chip values. */
+  const uploadProvider = (): [ScreenshotProvider, FrameMeta] => (kindSelect.value === 'physical_photo'
+    ? [physicalAsScreenshotProvider(claudePhysicalProvider(), loadChipConfig), { source: 'physical_photo' }]
+    : [claudeScreenshotProvider(), { source: 'screenshot' }]);
 
   let shots: Shot[] = [];
   const observations = new Map<string, HandObservation>();
@@ -134,7 +145,7 @@ export function initReconstruction(options: { replay: ReplayController }) {
   const entries = () => shots.map(s => s.entry);
   const shotById = (id: string) => shots.find(s => s.entry.id === id);
   const indexOf = (id: string) => shots.findIndex(s => s.entry.id === id);
-  const frameName = (entry: ScreenshotEntry, i: number) => 'Frame ' + (i + 1) + (entry.timestampMs !== undefined ? ' (' + formatVideoTime(entry.timestampMs) + ')' : '');
+  const frameName = (entry: ScreenshotEntry, i: number) => 'Frame ' + (i + 1) + (entry.timestampMs !== undefined ? ' (' + formatVideoTime(entry.timestampMs) + ')' : entry.source === 'physical_photo' ? ' (photo)' : '');
 
   // -------------------------------------------------------------------------
   // Recognition queue
@@ -207,7 +218,8 @@ export function initReconstruction(options: { replay: ReplayController }) {
   fileInput.addEventListener('change', () => {
     const files = [...(fileInput.files ?? [])];
     fileInput.value = '';
-    if (files.length) void addFiles(files, () => claudeScreenshotProvider());
+    const [provider, meta] = uploadProvider();
+    if (files.length) void addFiles(files, () => provider, () => meta);
   });
   drop.addEventListener('dragover', event => {
     event.preventDefault();
@@ -221,7 +233,8 @@ export function initReconstruction(options: { replay: ReplayController }) {
     const video = files.find(f => f.type.startsWith('video/'));
     if (video) void startVideo(video);
     const images = files.filter(f => !f.type.startsWith('video/'));
-    if (images.length) void addFiles(images, () => claudeScreenshotProvider());
+    const [provider, meta] = uploadProvider();
+    if (images.length) void addFiles(images, () => provider, () => meta);
   });
   drop.addEventListener('keydown', event => {
     if (event.key === 'Enter' || event.key === ' ') {
@@ -245,6 +258,20 @@ export function initReconstruction(options: { replay: ReplayController }) {
   }
 
   sample.addEventListener('change', async () => {
+    if (sample.value === 'physical-sequence') {
+      sample.value = '';
+      if (shots.length && dirty && !confirm('Replace the current frames with the physical table photos?')) return;
+      reset();
+      try {
+        const files = await Promise.all(PHYSICAL_SEQUENCE.map(f => svgToPng(drawPhysicalScene(f.scene), f.scene.id + '.png')));
+        await addFiles(files, (_file, i) => physicalAsScreenshotProvider(fixturePhysicalProvider(PHYSICAL_SEQUENCE[i].response, 'sample:' + PHYSICAL_SEQUENCE[i].scene.id), () => DEMO_CHIPS), () => ({ source: 'physical_photo' }));
+        session.title = 'Physical table photos';
+        status.textContent = 'Sample photos loaded: three photos of one physical hand, read from stored results (not AI recognition), with the demo chip values red 5, green 25, black 100. Press Read frames.';
+      } catch (error) {
+        status.textContent = error instanceof Error ? error.message : 'The sample could not be drawn.';
+      }
+      return;
+    }
     const seq = sequenceById(sample.value);
     sample.value = '';
     if (!seq) return;
@@ -1394,4 +1421,26 @@ export function initReconstruction(options: { replay: ReplayController }) {
   });
   renderSaved();
   render();
+
+  return {
+    /** Add a photo reviewed in Scan table as an already-recognized frame; it is not read again. */
+    async addRecognizedFrame(file: File, recognition: ScreenshotRecognition, label: string): Promise<string> {
+      if (shots.length >= MAX_SCREENSHOTS) return 'Track hand already holds ' + MAX_SCREENSHOTS + ' frames. Remove one first.';
+      let bitmap: ImageBitmap;
+      try {
+        bitmap = await decodeImage(file);
+      } catch (error) {
+        return error instanceof Error ? error.message : 'The photo could not be added.';
+      }
+      const { added } = addScreenshots(entries(), [label], makeId);
+      const entry: ScreenshotEntry = { ...added[0], source: 'physical_photo' };
+      shots.push({ entry, url: URL.createObjectURL(file), objectUrl: true, bitmap, provider: null });
+      queue.markDone(entry.id);
+      observations.set(entry.id, withRecognition(createObservation(entry.id, shots.length - 1, recognition, { source: 'physical_photo' }), recognition));
+      selected ??= entry.id;
+      dirty = true;
+      refresh();
+      return 'Added to Track hand as frame ' + shots.length + '. Open Track hand to order it with other photos and compare them.';
+    },
+  };
 }

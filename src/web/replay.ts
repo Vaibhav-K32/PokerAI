@@ -36,15 +36,15 @@ function deepFreeze<T>(value: T): T {
 }
 
 export interface ReplayController {
-  showView(view: 'study' | 'replay' | 'screenshot' | 'reconstruct'): void;
+  showView(view: 'study' | 'replay' | 'screenshot' | 'reconstruct' | 'physical'): void;
   /** Reload saved hands from storage and redraw the list. */
   reloadHands(): void;
   /** Open a saved hand at a replay position and show the replay view. */
   openHand(handId: string, position: number): boolean;
 }
 
-export function initReplay(options: { onAnalyze: (snapshot: Snapshot) => void; onLeaveScreenshot?: () => void }): ReplayController {
-  const views = ['study', 'replay', 'screenshot', 'reconstruct'] as const;
+export function initReplay(options: { onAnalyze: (snapshot: Snapshot) => void; onLeaveScreenshot?: () => void; onLeavePhysical?: () => void }): ReplayController {
+  const views = ['study', 'replay', 'screenshot', 'reconstruct', 'physical'] as const;
   const tabs = [...document.querySelectorAll<HTMLButtonElement>('.view-tab')];
   const status = element('history-status');
   const list = element('hand-list');
@@ -67,6 +67,8 @@ export function initReplay(options: { onAnalyze: (snapshot: Snapshot) => void; o
   function showView(view: string) {
     if (view !== 'replay') pause();
     if (view !== 'screenshot') options.onLeaveScreenshot?.();
+    // Leaving Scan table releases the camera.
+    if (view !== 'physical') options.onLeavePhysical?.();
     for (const name of views) element(name + '-view').hidden = name !== view;
     for (const tab of tabs) {
       if (tab.dataset.view === view) tab.setAttribute('aria-current', 'page');

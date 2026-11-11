@@ -13,8 +13,9 @@ export const MAX_SCREENSHOTS = 20;
 export type ReviewStatus = 'pending' | 'reviewed' | 'corrected';
 
 /** One uploaded screenshot, in the user's chosen order. */
-/** Where a frame came from: an uploaded screenshot, or a frame taken from an uploaded video. */
-export type FrameSource = 'screenshot' | 'video';
+/** Where a frame came from: a screenshot of a digital table, a frame of an uploaded video, or a photo of a physical table. */
+export type FrameSource = 'screenshot' | 'video' | 'physical_photo';
+export const FRAME_SOURCES: readonly FrameSource[] = ['screenshot', 'video', 'physical_photo'];
 
 export interface ScreenshotEntry {
   /** Stable for the session; never derived from the filename. */
@@ -332,7 +333,7 @@ export interface ReconstructionSession {
   /** True when the screenshot images were saved too. */
   readonly imagesSaved: boolean;
   /** `screenshots`, `video`, or `mixed`, from the frames' sources. */
-  readonly sourceType: 'screenshots' | 'video' | 'mixed';
+  readonly sourceType: 'screenshots' | 'video' | 'photos' | 'mixed';
   /** Player matches and visibility the user set. */
   readonly identity: { readonly overrides: readonly IdentityOverride[]; readonly hidden: readonly HiddenMark[] };
   /** Per-interval results at save time, for reading the file elsewhere. Recomputed on open. */

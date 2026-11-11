@@ -52,6 +52,19 @@ Select **Track hand**. To see the whole workflow without an API key, press **Loa
 
 Details: [src/reconstruction/RECONSTRUCTION.md](src/reconstruction/RECONSTRUCTION.md).
 
+### Scan a physical table
+
+Select **Scan table**. To try it without an API key, pick a demo and press **Load physical table demo**: six staged tables, read from stored results and clearly marked as sample data.
+
+- **Photo:** choose or drop a JPEG, PNG, or WebP photo of real cards and chips. Or press **Use the camera**: it asks for permission, prefers the rear camera, and takes one still with **Capture**. Notes about darkness, glare, low resolution, blur, or cut-off cards show their measurements.
+- **Reading:** press **Read table**. Claude reads the cards (with rough positions), seats, the dealer button, and chip piles. The app checks the grouping against the positions, so a card it cannot place confidently is left for you.
+- **Review:** zoom, rotate, and toggle the approximate outlines; dashed orange ones need checking.
+  - **Cards and seats:** correct any card, move cards between the board and seats, add or remove cards and seats, reorder seats, mark your seat and the dealer, and place the table centre or seats on the photo.
+  - **Chips:** set what each chip colour is worth in your game, then confirm or correct chip counts. Stacks, bets, and the pot follow from the chips unless you type them.
+- **Use it:** **Load into study table** (after entering the blinds), or **Add to Track hand** to build a timeline from several photos. In Track hand you can also choose **Images are: Photos of a physical table** to add several photos at once.
+
+Details and limits: [src/physical/PHYSICAL.md](src/physical/PHYSICAL.md).
+
 ## Phone and offline use
 
 For a phone trial, serve `dist/` from an HTTPS static origin the phone can reach. First load it while connected and give the service worker time to cache the app before checking an offline reload. Use your browser’s install or home screen option if available. The file picker works as the fallback on browsers that do not support direct photo capture. The local development server listens on loopback by default. A static host has no `/api/recognize` endpoint, so photo recognition works only through `npm start` (or another server that mounts `scripts/recognize.mjs`); browsers allow camera capture on a phone only over HTTPS.
@@ -61,6 +74,6 @@ For a phone trial, serve `dist/` from an HTTPS static origin the phone can reach
 - [Specification](SPEC.md) covers product boundaries, data contracts, decision assumptions, and capture privacy.
 - [Implementation plan](PLAN.md) covers milestones, the test matrix, and the next work item.
 - [Repository instructions](AGENTS.md) and [Claude Code entry point](CLAUDE.md) define how to divide and review tasks.
-- `src/core/` holds state, the plugin registry, and equity. `src/rules/` holds Hold’em rules. `src/history/` holds the hand history and replay engine (pure, no browser APIs). `src/vision/` holds the photo and screenshot recognition contracts, providers, review checks, and synthetic screenshot fixtures. `src/reconstruction/` holds hand tracking as separate pure modules: player identity (`identity.ts`), state comparison (`compare.ts`), temporal consistency (`consistency.ts`), reconstruction (`reconstruct.ts`), replay steps, the recognition queue, and sessions. `scripts/recognize.mjs` is the server-side Claude API endpoint. `src/web/` and `web/` hold the table interface and worker entry points.
+- `src/core/` holds state, the plugin registry, and equity. `src/rules/` holds Hold’em rules. `src/history/` holds the hand history and replay engine (pure, no browser APIs). `src/vision/` holds the photo and screenshot recognition contracts, providers, review checks, and synthetic screenshot fixtures. `src/physical/` holds physical-table photos: the spatial model, reading validation, table geometry, chip values, corrections, conversion to the shared table state, photo quality, and demo scenes (pure, no browser APIs). `src/reconstruction/` holds hand tracking as separate pure modules: player identity (`identity.ts`), state comparison (`compare.ts`), temporal consistency (`consistency.ts`), reconstruction (`reconstruct.ts`), replay steps, the recognition queue, and sessions. `scripts/recognize.mjs` is the server-side Claude API endpoint. `src/web/` and `web/` hold the table interface and worker entry points.
 
 The folder is ready to put under Git. Start each coding agent from this directory so it picks up the project instructions.

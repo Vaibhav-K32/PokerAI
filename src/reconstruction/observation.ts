@@ -3,7 +3,7 @@
 import {
   restoreRecognition, type ConfidenceLabel, type RecognizedField, type ScreenshotRecognition,
 } from '../vision/screenshot.js';
-import type { FrameSource, HandObservation, ReviewStatus } from './types.js';
+import { FRAME_SOURCES, type FrameSource, type HandObservation, type ReviewStatus } from './types.js';
 
 export class ReconstructionError extends Error {
   constructor(message: string) {
@@ -111,7 +111,7 @@ export function restoreObservation(raw: unknown): HandObservation {
     throw new ReconstructionError('An observation time must be an ISO time or null.');
   }
   if (!STATUSES.includes(raw.reviewStatus as ReviewStatus)) throw new ReconstructionError('An observation has an unknown review status.');
-  if (raw.source !== 'screenshot' && raw.source !== 'video') throw new ReconstructionError('An observation must come from a screenshot or a video frame.');
+  if (!FRAME_SOURCES.includes(raw.source as FrameSource)) throw new ReconstructionError('An observation must come from a screenshot, a video frame, or a table photo.');
   const timestampMs = raw.timestampMs ?? null;
   if (timestampMs !== null && (!Number.isSafeInteger(timestampMs) || (timestampMs as number) < 0 || (timestampMs as number) > MAX_TIMESTAMP_MS || raw.source !== 'video')) {
     throw new ReconstructionError('A frame time must be a whole number of milliseconds, and only video frames have one.');
@@ -125,6 +125,6 @@ export function restoreObservation(raw: unknown): HandObservation {
   return {
     id: raw.id, screenshotId: raw.screenshotId, sequenceIndex: raw.sequenceIndex as number,
     timestamp: raw.timestamp as string | null, timestampMs: timestampMs as number | null, recognition,
-    reviewStatus: reviewStatusOf(recognition, raw.reviewStatus as ReviewStatus), source: raw.source,
+    reviewStatus: reviewStatusOf(recognition, raw.reviewStatus as ReviewStatus), source: raw.source as FrameSource,
   };
 }

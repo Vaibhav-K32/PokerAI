@@ -8,6 +8,7 @@ import { cardName, rankLabel, renderCardFace, suitNames, suitSymbols } from './c
 import { pickCard } from './card-picker.js';
 import { prepareUpload } from './image.js';
 import { initReplay } from './replay.js';
+import { initPhysicalScan } from './physical-view.js';
 import { initReconstruction } from './reconstruct-view.js';
 import { initScreenshotImport } from './screenshot-view.js';
 import { cloudRecognizer, type Confidence, type Recognition } from '../vision/recognizer.js';
@@ -871,9 +872,11 @@ function loadSnapshot(s: Snapshot) {
 }
 
 let screenshotImport: { leave(): void } | null = null;
-const replay = initReplay({ onAnalyze: loadSnapshot, onLeaveScreenshot: () => screenshotImport?.leave() });
+let physicalScan: { leave(): void } | null = null;
+const replay = initReplay({ onAnalyze: loadSnapshot, onLeaveScreenshot: () => screenshotImport?.leave(), onLeavePhysical: () => physicalScan?.leave() });
 screenshotImport = initScreenshotImport({ loadIntoTable: loadSnapshot, replay });
-initReconstruction({ replay });
+const tracker = initReconstruction({ replay });
+physicalScan = initPhysicalScan({ loadIntoTable: loadSnapshot, showStudy: () => replay.showView('study'), track: tracker });
 
 if (window.isSecureContext && 'serviceWorker' in navigator) {
   // When a newer build takes control, reload once so the page runs it. Skip the

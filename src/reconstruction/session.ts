@@ -3,7 +3,7 @@
 import { MAX_TIMESTAMP_MS, ReconstructionError, restoreObservation } from './observation.js';
 import { reconstructHand } from './reconstruct.js';
 import {
-  MAX_SCREENSHOTS, RECONSTRUCTION_KIND, RECONSTRUCTION_SCHEMA_VERSION,
+  FRAME_SOURCES, MAX_SCREENSHOTS, RECONSTRUCTION_KIND, RECONSTRUCTION_SCHEMA_VERSION, type FrameSource,
   type HandObservation, type HiddenMark, type IdentityOverride, type IntervalResolution, type ManualAction, type ManualActionType, type ReconstructionSession, type ScreenshotEntry,
 } from './types.js';
 
@@ -108,7 +108,7 @@ export function createSession(input: {
     resolutions,
     warnings: [...result.warnings],
     imagesSaved,
-    sourceType: sources.size > 1 ? 'mixed' : sources.has('video') ? 'video' : 'screenshots',
+    sourceType: sources.size > 1 ? 'mixed' : sources.has('video') ? 'video' : sources.has('physical_photo') ? 'photos' : 'screenshots',
     identity,
     validation: result.intervals.map(i => ({ from: i.from, to: i.to, status: i.status, consistency: i.consistency })),
   };
@@ -152,14 +152,14 @@ function parseScreenshot(raw: unknown): ScreenshotEntry {
   if (raw.image !== undefined && (typeof raw.image !== 'string' || !raw.image.startsWith('data:image/jpeg;base64,'))) {
     throw new ReconstructionError('A saved screenshot image must be a JPEG data URL.');
   }
-  if (raw.source !== undefined && raw.source !== 'screenshot' && raw.source !== 'video') throw new ReconstructionError('A frame source must be screenshot or video.');
+  if (raw.source !== undefined && !FRAME_SOURCES.includes(raw.source as FrameSource)) throw new ReconstructionError('A frame source must be screenshot, video, or physical_photo.');
   if (raw.timestampMs !== undefined && (raw.source !== 'video' || !Number.isSafeInteger(raw.timestampMs) || (raw.timestampMs as number) < 0 || (raw.timestampMs as number) > MAX_TIMESTAMP_MS)) {
     throw new ReconstructionError('Only video frames have a time, in whole milliseconds.');
   }
   return {
     id: raw.id, label: raw.label.slice(0, 200), uploadIndex: raw.uploadIndex as number,
     ...(typeof raw.image === 'string' ? { image: raw.image } : {}),
-    ...(raw.source === 'video' ? { source: 'video' as const } : {}),
+    ...(raw.source === 'video' || raw.source === 'physical_photo' ? { source: raw.source as FrameSource } : {}),
     ...(raw.timestampMs !== undefined ? { timestampMs: raw.timestampMs as number } : {}),
   };
 }

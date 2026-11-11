@@ -64,6 +64,27 @@ Sessions (schema version 2, with a migration from version 1) store frame order, 
 
 Details: [src/reconstruction/RECONSTRUCTION.md](src/reconstruction/RECONSTRUCTION.md).
 
+### Physical table photos
+
+Scan table reads one user-chosen still photo of a physical table from a simulated game, a demonstration, or a finished hand. Photos come from upload or a camera still taken after an explicit tap. The camera prefers the rear lens, is released after capture, on close, on leaving the view, and when the page is hidden, and never records. Images go through the same checks, resizing, endpoint (`layout=physical`), and server-held key as screenshots, opt-in per photo.
+
+**Photo quality:** deterministic checks report darkness, glare, low resolution, and blur from pixel measurements, and cut-off cards and distance from card boxes. Each note states its evidence, and the user may continue.
+
+**What is read:** cards (code, partial rank or suit, visibility, rough normalized box, rotation, zone), seats (clockwise, with clearly empty bet areas), the dealer button, and chip piles (colour, count as counted, estimated, or unknown, zone). Malformed readings are rejected.
+
+**Grouping:** the table geometry module groups cards and chips by position, orders the board along its own axis and the seats clockwise from the user, and leaves near-ties and reader–geometry disagreements unassigned. User placements and seat orders are never overridden.
+
+**Chips:** chip values come from a user-defined configuration with no assumed colours. A count is confirmed, estimated, or unknown, and unknown is never zero.
+
+**Review and conversion:**
+- Every card, seat, chip pile, and table value is correctable, and duplicate cards, overfull seats, and boards over five cards block use.
+- Reviewed photos convert into the shared `ScreenshotRecognition` and must pass the existing study checks and `holdem.validate` to be loaded; missing values are requested, not invented.
+- Photos join Step 4 tracking as frames with source `physical_photo`, singly from Scan table or in batches in Track hand.
+
+**Demo:** six staged demo tables and a three-photo sequence work without an API key and are labelled as sample data.
+
+Details: [src/physical/PHYSICAL.md](src/physical/PHYSICAL.md).
+
 ## Platform and interface
 
 Use strict TypeScript, standard browser APIs, a static HTML/CSS interface, and a worker for equity. One client serves desktop and phone. A manifest and service worker provide the offline shell after a successful first load on a secure origin. Use localhost for development and HTTPS for installation on a phone. Photo capture support varies, so retain a regular file picker. Revisit a native wrapper only if device testing identifies a concrete camera, inference, or installation gap.

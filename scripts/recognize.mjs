@@ -101,10 +101,95 @@ Card codes are a rank from 2 3 4 5 6 7 8 9 T J Q K A followed by a suit letter: 
 
 For every field give a confidence: "high" only when it is clearly legible, "medium" or "low" when you are unsure, and "none" when the value is null. Never compute, estimate, or infer a value from game rules or other fields; report null instead. Never advise on play. Put short notes about cropping, overlapping elements, unreadable text, or unusual layouts in issues.`;
 
+// ---------------------------------------------------------------------------
+// Physical layout: a photo of real cards and chips on a table.
+// ---------------------------------------------------------------------------
+const point = nullable({
+  type: 'object', additionalProperties: false, required: ['x', 'y'],
+  properties: { x: { type: 'number' }, y: { type: 'number' } },
+});
+const box = nullable({
+  type: 'object', additionalProperties: false, required: ['x', 'y', 'width', 'height'],
+  properties: { x: { type: 'number' }, y: { type: 'number' }, width: { type: 'number' }, height: { type: 'number' } },
+});
+const physicalSeat = {
+  type: 'object', additionalProperties: false, required: ['label', 'position', 'isUser', 'status', 'betArea'],
+  properties: {
+    label: field(nullable({ type: 'string' })),
+    position: point,
+    isUser: { type: 'boolean' },
+    status: { type: 'string', enum: ['active', 'folded', 'unknown'] },
+    betArea: { type: 'string', enum: ['empty', 'has_chips', 'unclear'] },
+  },
+};
+const physicalCard = {
+  type: 'object', additionalProperties: false,
+  required: ['card', 'rank', 'suit', 'confidence', 'visibility', 'box', 'rotation', 'zone', 'seat'],
+  properties: {
+    card: { type: 'string', enum: [...CARD_CODES, 'unknown', 'face_down'] },
+    rank: nullable({ type: 'string', enum: [...ranks] }),
+    suit: nullable({ type: 'string', enum: ['c', 'd', 'h', 's'] }),
+    confidence,
+    visibility: { type: 'string', enum: ['face_up', 'face_down', 'partially_visible', 'unknown'] },
+    box,
+    rotation: nullable({ type: 'number' }),
+    zone: { type: 'string', enum: ['board', 'seat', 'unknown'] },
+    seat: nullable({ type: 'integer' }),
+  },
+};
+const physicalChips = {
+  type: 'object', additionalProperties: false,
+  required: ['color', 'count', 'countCertainty', 'position', 'box', 'zone', 'seat'],
+  properties: {
+    color: nullable({ type: 'string' }),
+    count: nullable({ type: 'integer' }),
+    countCertainty: { type: 'string', enum: ['counted', 'estimated', 'unknown'] },
+    position: point,
+    box,
+    zone: { type: 'string', enum: ['stack', 'bet', 'pot', 'unknown'] },
+    seat: nullable({ type: 'integer' }),
+  },
+};
+export const PHYSICAL_SCHEMA = {
+  type: 'object', additionalProperties: false,
+  required: ['tableCenter', 'seats', 'cards', 'dealerButton', 'chips', 'pot', 'potArea', 'street', 'issues'],
+  properties: {
+    tableCenter: point,
+    seats: { type: 'array', items: physicalSeat },
+    cards: { type: 'array', items: physicalCard },
+    dealerButton: {
+      type: 'object', additionalProperties: false, required: ['position', 'seat'],
+      properties: { position: point, seat: nullable({ type: 'integer' }) },
+    },
+    chips: { type: 'array', items: physicalChips },
+    pot: field(nullable({ type: 'integer' })),
+    potArea: { type: 'string', enum: ['empty', 'has_chips', 'unclear'] },
+    street: field(nullable({ type: 'string', enum: ['preflop', 'flop', 'turn', 'river'] })),
+    issues: { type: 'array', items: { type: 'string' } },
+  },
+};
+
+const PHYSICAL_SYSTEM = `You read one photo of a real, physical Texas Hold'em table for an offline poker study app: a simulated game, a teaching demonstration, or a finished hand being reviewed. The user reviews and corrects everything you report, so report only what you can see; accuracy matters more than completeness. The camera can be at any seat or angle, the table may be rotated or seen in perspective, and cards may use any deck design.
+
+Coordinates: give every position and box as fractions of the image (x from the left edge, y from the top edge, 0 to 1). They are approximate and are used only to group cards and draw rough outlines; give null when you cannot place something.
+
+seats: each player position you can identify (a player, their cards, or their chips), listed clockwise as seen in the photo, starting from the seat nearest the camera (bottom of the image). label: a name only if written on a card or placard, else null. position: the centre of that seat's area. isUser: true only for the seat nearest the camera when its cards face the camera; at most one seat. status: "folded" only when that seat's cards are clearly mucked or pushed away, "active" when clearly in the hand, otherwise "unknown". betArea: "empty" only when the space in front of that seat is clearly visible and has no chips, "has_chips" when chips are pushed forward there, "unclear" when you cannot see it.
+
+cards: every playing card you can see, one entry each. card: the code when both rank and suit are clearly legible, "face_down" for a card back, "unknown" when a face is visible but not fully readable; in that case still give rank or suit if one of them is clearly legible (never both). confidence: "high" only when both rank and suit indices are clearly legible; "medium" or "low" for glare, blur, angle, or similar-looking ranks (6/9, 8/3, J/Q); "none" for face-down or unread cards. visibility: face_up, face_down, partially_visible (partly covered or out of frame), or unknown. box: a rough box around the card. rotation: degrees from upright if obvious, else null. zone: "board" for community cards in the middle of the table, "seat" for a player's hole cards (set seat to that seat's index), "unknown" when you cannot tell which.
+
+dealerButton: where the dealer button is and the index of the seat it sits in front of, or nulls.
+
+chips: each separate chip stack or pile. color: a plain colour name (for example "red", "green", "black"). count: the number of chips only when the stack can be counted; "counted" when you counted every chip, "estimated" when approximate, "unknown" when stacks overlap or the count is unreadable (count null). zone: "stack" for a player's chips behind, "bet" for chips pushed in front of a seat, "pot" for chips in the middle, "unknown" otherwise; seat is the seat index for stack or bet. Never convert chips to money: colours have no fixed value.
+
+pot: only a number written or displayed on the table, else null. potArea: "empty" only when the middle of the table is clearly visible with no chips, "has_chips" when there are chips in the middle, "unclear" otherwise. street: only if stated somewhere, else null.
+
+Never guess hidden cards, chip counts, names, or values; use null or "unknown". Never advise on play. Put short notes about glare, shadows, overlap, blur, cards cut off by the frame, or an unusual layout in issues.`;
+
 /** Prompt and schema for each supported layout. */
 export const LAYOUTS = {
   cards: { system: SYSTEM, schema: RESULT_SCHEMA, prompt: 'Transcribe the face-up cards in this photo by row.' },
   screenshot: { system: SCREENSHOT_SYSTEM, schema: SCREENSHOT_SCHEMA, prompt: 'Read the table state shown in this screenshot.' },
+  physical: { system: PHYSICAL_SYSTEM, schema: PHYSICAL_SCHEMA, prompt: 'Read the cards, seats, dealer button, and chips in this photo of a physical table.' },
 };
 
 /** Upper bound for one recognition request. */

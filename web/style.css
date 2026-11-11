@@ -428,3 +428,39 @@ footer { padding-block: 1.25rem 2rem; color: #425d55; font-size: .88rem; }
 .recon-player-list select { width: auto; min-height: 2.2rem; margin: 0; padding: .2rem .4rem; font-size: .82rem; }
 .evidence-confirmed { color: #1f3566; font-weight: 700; }
 .evidence-inferred { font-style: italic; }
+
+/* Scan table --------------------------------------------------------------- */
+.physical-workspace { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.15rem; margin-top: -1rem; }
+.phys-camera { margin: .8rem 0; padding: .8rem; border: 1px solid #d7e0d6; border-radius: .9rem; background: #10201a; color: #eaf4e4; }
+.phys-camera video { width: 100%; max-height: 60vh; background: #000; border-radius: .6rem; object-fit: contain; }
+.phys-controls { display: flex; flex-wrap: wrap; gap: .4rem .7rem; align-items: center; }
+.phys-controls button { min-height: 2.2rem; padding: .2rem .55rem; }
+.phys-frame { overflow: auto; }
+.phys-stage { position: relative; width: calc(var(--zoom, 1) * 100%); transform-origin: center; transition: transform .15s; }
+.phys-stage[data-rotation="90"] { transform: rotate(90deg); }
+.phys-stage[data-rotation="180"] { transform: rotate(180deg); }
+.phys-stage[data-rotation="270"] { transform: rotate(270deg); }
+.phys-stage img { display: block; width: 100%; height: auto; }
+.phys-stage.placing img { cursor: crosshair; }
+.phys-overlay { position: absolute; inset: 0; pointer-events: none; }
+.phys-box { position: absolute; min-height: 0; padding: 0; border: 2px solid #4ade80; border-radius: .25rem; background: rgba(74, 222, 128, .08); pointer-events: auto; cursor: pointer; }
+.phys-box.uncertain { border: 2px dashed #f59e0b; background: rgba(245, 158, 11, .12); }
+.phys-box.selected { border-color: #f2c94c; box-shadow: 0 0 0 3px #f2c94c; }
+.phys-center { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: #f2c94c; border: 2px solid #102624; }
+.phys-seat-tag { position: absolute; transform: translate(-50%, -50%); padding: .05rem .4rem; border-radius: 1rem; background: #102624; color: #fff; font-size: .75rem; font-weight: 750; }
+.phys-seat-tag.hero { background: #f2c94c; color: #102624; }
+.phys-source { padding: .45rem .6rem; border-radius: .5rem; font-size: .85rem; font-weight: 650; }
+.phys-source.sample { background: #f4e3f5; color: #5b2160; }
+.phys-source.ai { background: #dfe6f5; color: #1f3566; }
+.phys-card { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; padding: .3rem; border-radius: .5rem; margin: .25rem 0; }
+.phys-card.selected { background: #fff7d6; box-shadow: inset 0 0 0 2px #f2c94c; }
+.phys-card.has-error { box-shadow: inset 0 0 0 2px #b3261e; }
+.phys-card .card-slot { --card-w: 2.6rem; }
+.phys-card-meta { display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; }
+.phys-card-meta select, .phys-chip-row select { width: auto; min-height: 2.2rem; margin: 0; padding: .2rem .4rem; font-size: .82rem; }
+.phys-chip-row { display: flex; flex-wrap: wrap; gap: .4rem; align-items: end; margin: .3rem 0; }
+.phys-chip-row .review-field { min-width: 6rem; flex: 1; }
+.phys-chip-value { align-self: center; }
+.phys-amount { display: flex; flex-wrap: wrap; gap: .4rem; align-items: end; margin: .35rem 0; }
+.phys-amount .review-field { min-width: 7rem; }
+.phys-cards { margin: .3rem 0; }
