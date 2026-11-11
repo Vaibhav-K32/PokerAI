@@ -29,6 +29,7 @@
     <button type="button" class="view-tab" data-view="screenshot">Import screenshot</button>
     <button type="button" class="view-tab" data-view="reconstruct">Track hand</button>
     <button type="button" class="view-tab" data-view="physical">Scan table</button>
+    <button type="button" class="view-tab" data-view="benchmark">Benchmarks</button>
   </nav>
   <main class="wrap workspace" id="study-view">
     <section class="panel table-panel" aria-labelledby="table-title">
@@ -454,6 +455,99 @@
         </div>
         <div class="review-state" id="phys-state"></div>
       </div>
+    </section>
+  </main>
+
+  <main class="wrap bench-workspace" id="benchmark-view" hidden>
+    <section class="panel" aria-labelledby="bench-title">
+      <div class="heading">
+        <h2 id="bench-title">Recognition benchmarks</h2>
+      </div>
+      <p class="phys-source sample">Evaluation tool for developers. Results describe the chosen dataset only and are not a guarantee of recognition accuracy. Scores on the built-in synthetic drawings say nothing about real images.</p>
+      <div class="actions">
+        <label class="review-field">Dataset
+          <select id="bench-dataset">
+            <option value="builtin">Built-in synthetic dataset</option>
+            <option value="annotations">My saved annotations</option>
+            <option value="imported" hidden>Imported dataset</option>
+          </select>
+        </label>
+        <label class="button secondary file-button">Import dataset JSON<input type="file" id="bench-dataset-file" accept="application/json,.json"></label>
+        <label class="button secondary file-button">Add image files<input type="file" id="bench-images" accept="image/png,image/jpeg,image/webp" multiple></label>
+      </div>
+      <p id="bench-dataset-info" class="fine-print"></p>
+      <div class="actions">
+        <label class="review-field">Recognizer
+          <select id="bench-mode">
+            <option value="mock">Mock: stored fixture readings (free, deterministic)</option>
+            <option value="real">Real: Claude through the app server (paid)</option>
+          </select>
+        </label>
+        <label class="checkbox"><input type="checkbox" id="bench-src-digital_screenshot" checked> Screenshots</label>
+        <label class="checkbox"><input type="checkbox" id="bench-src-physical_photo" checked> Photos</label>
+        <label class="review-field">Sample limit<input type="number" id="bench-limit" min="1" step="1" placeholder="all"></label>
+        <label class="checkbox"><input type="checkbox" id="bench-raw"> Keep raw readings for debugging</label>
+      </div>
+      <div class="actions">
+        <button type="button" id="bench-run">Run benchmark</button>
+        <button type="button" id="bench-cancel" class="secondary" hidden>Cancel</button>
+      </div>
+      <p id="bench-progress" class="fine-print" role="status" aria-live="polite"></p>
+      <p id="bench-status" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="panel" id="bench-results" aria-labelledby="bench-results-title" hidden>
+      <div class="heading">
+        <h2 id="bench-results-title">Results</h2>
+        <div class="actions">
+          <button type="button" id="bench-export-json" class="secondary">Export JSON</button>
+          <button type="button" id="bench-export-csv" class="secondary">Export CSV</button>
+        </div>
+      </div>
+      <div id="bench-overview"></div>
+      <div id="bench-breakdown" class="bench-grid"></div>
+      <div class="bench-grid">
+        <div id="bench-difficulty"></div>
+        <div id="bench-confidence"></div>
+        <div id="bench-tracking"></div>
+      </div>
+      <div id="bench-failures"></div>
+      <h3>Sample explorer</h3>
+      <label class="review-field">Sample<select id="bench-sample"></select></label>
+      <div id="bench-explorer"></div>
+    </section>
+
+    <section class="panel" aria-labelledby="bench-runs-title">
+      <div class="heading">
+        <h2 id="bench-runs-title">Saved runs</h2>
+        <label class="button secondary file-button">Import run JSON<input type="file" id="bench-import-run" accept="application/json,.json"></label>
+      </div>
+      <ul id="bench-runs" class="hand-list"></ul>
+      <div class="actions">
+        <label class="review-field">Baseline<select id="bench-compare-a"></select></label>
+        <label class="review-field">Current<select id="bench-compare-b"></select></label>
+        <button type="button" id="bench-compare" class="secondary">Compare</button>
+      </div>
+      <div id="bench-compare-result"></div>
+    </section>
+
+    <section class="panel" aria-labelledby="bench-annotate-title">
+      <div class="heading">
+        <h2 id="bench-annotate-title">Annotate ground truth</h2>
+        <button type="button" id="bench-annotate-new" class="secondary">New annotation</button>
+      </div>
+      <p>Label what a careful person can see in an image. This is entered by you and kept separate from any recognizer output; leave anything you cannot see as not visible or unreadable.</p>
+      <label class="button secondary file-button">Choose image<input type="file" id="bench-annotate-image" accept="image/png,image/jpeg,image/webp"></label>
+      <div class="review-grid">
+        <div><img id="bench-annotate-preview" class="bench-image" alt="The image being annotated" hidden></div>
+        <div id="bench-annotate-form"></div>
+      </div>
+      <div class="actions">
+        <button type="button" id="bench-annotate-validate" class="secondary">Validate</button>
+        <button type="button" id="bench-annotate-save">Save annotation</button>
+        <button type="button" id="bench-annotate-export" class="secondary">Export saved annotations as a dataset</button>
+      </div>
+      <p id="bench-annotate-status" role="status" aria-live="polite"></p>
     </section>
   </main>
 

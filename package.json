@@ -10,7 +10,8 @@
     "build": "tsc && node scripts/copy-web.mjs",
     "start": "node scripts/serve.mjs",
     "test": "npm run build && node --test tests/*.test.mjs",
-    "check": "npm test"
+    "check": "npm test",
+    "benchmark": "npm run build && node scripts/benchmark.mjs"
   },
   "devDependencies": {
     "typescript": "5.9.3"

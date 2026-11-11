@@ -1,0 +1,3949 @@
+{
+  "kind": "poker-study/benchmark-dataset",
+  "schemaVersion": 1,
+  "name": "Poker Study synthetic benchmark",
+  "datasetVersion": "synthetic-1",
+  "samples": [
+    {
+      "id": "shot-heads-up-preflop",
+      "sourceType": "digital_screenshot",
+      "image": {
+        "kind": "synthetic",
+        "fixture": "screenshot:heads-up-preflop"
+      },
+      "groundTruth": {
+        "players": [
+          {
+            "name": "You",
+            "cards": [
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "As"
+                }
+              },
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Kd"
+                }
+              }
+            ],
+            "stack": 995,
+            "bet": 5,
+            "folded": false
+          },
+          {
+            "name": "Morgan",
+            "cards": [
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              },
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              }
+            ],
+            "stack": 990,
+            "bet": 10,
+            "folded": false
+          }
+        ],
+        "board": [],
+        "pot": 0,
+        "dealerSeat": 0,
+        "heroSeat": 0,
+        "street": "preflop",
+        "smallBlind": 5,
+        "bigBlind": 10
+      },
+      "tags": [
+        "clean"
+      ],
+      "metadata": {
+        "imageQuality": "synthetic drawing"
+      },
+      "annotationStatus": "verified"
+    },
+    {
+      "id": "shot-three-player-flop",
+      "sourceType": "digital_screenshot",
+      "image": {
+        "kind": "synthetic",
+        "fixture": "screenshot:three-player-flop"
+      },
+      "groundTruth": {
+        "players": [
+          {
+            "name": "You",
+            "cards": [
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Qh"
+                }
+              },
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Qc"
+                }
+              }
+            ],
+            "stack": 470,
+            "bet": 0,
+            "folded": false
+          },
+          {
+            "name": "Riley",
+            "cards": [
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              },
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              }
+            ],
+            "stack": 455,
+            "bet": 0,
+            "folded": false
+          },
+          {
+            "name": "Sam",
+            "cards": [],
+            "stack": 990,
+            "bet": 0,
+            "folded": true
+          }
+        ],
+        "board": [
+          {
+            "card": {
+              "kind": "card",
+              "card": "7s"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "8d"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "2c"
+            }
+          }
+        ],
+        "pot": 75,
+        "dealerSeat": 1,
+        "heroSeat": 0,
+        "street": "flop",
+        "smallBlind": 5,
+        "bigBlind": 10
+      },
+      "tags": [
+        "clean"
+      ],
+      "metadata": {
+        "imageQuality": "synthetic drawing"
+      },
+      "annotationStatus": "verified"
+    },
+    {
+      "id": "shot-four-player-turn",
+      "sourceType": "digital_screenshot",
+      "image": {
+        "kind": "synthetic",
+        "fixture": "screenshot:four-player-turn"
+      },
+      "groundTruth": {
+        "players": [
+          {
+            "name": "You",
+            "cards": [
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Ah"
+                }
+              },
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Jh"
+                }
+              }
+            ],
+            "stack": 820,
+            "bet": 0,
+            "folded": false
+          },
+          {
+            "name": "Pat",
+            "cards": [
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              },
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              }
+            ],
+            "stack": 700,
+            "bet": 60,
+            "folded": false
+          },
+          {
+            "name": "Lee",
+            "cards": [],
+            "stack": 1210,
+            "bet": 0,
+            "folded": true
+          },
+          {
+            "name": "Kim",
+            "cards": [
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              },
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              }
+            ],
+            "stack": 600,
+            "bet": 0,
+            "folded": false
+          }
+        ],
+        "board": [
+          {
+            "card": {
+              "kind": "card",
+              "card": "Kh"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "9h"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "3d"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "2s"
+            }
+          }
+        ],
+        "pot": 240,
+        "dealerSeat": 2,
+        "heroSeat": 0,
+        "street": "turn",
+        "smallBlind": 10,
+        "bigBlind": 20
+      },
+      "tags": [
+        "clean"
+      ],
+      "metadata": {
+        "imageQuality": "synthetic drawing"
+      },
+      "annotationStatus": "verified"
+    },
+    {
+      "id": "shot-river-complete-board",
+      "sourceType": "digital_screenshot",
+      "image": {
+        "kind": "synthetic",
+        "fixture": "screenshot:river-complete-board"
+      },
+      "groundTruth": {
+        "players": [
+          {
+            "name": "You",
+            "cards": [
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Tc"
+                }
+              },
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Td"
+                }
+              }
+            ],
+            "stack": 500,
+            "bet": 0,
+            "folded": false
+          },
+          {
+            "name": "Ash",
+            "cards": [
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Ks"
+                }
+              },
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Qs"
+                }
+              }
+            ],
+            "stack": 350,
+            "bet": 100,
+            "folded": false
+          }
+        ],
+        "board": [
+          {
+            "card": {
+              "kind": "card",
+              "card": "Jh"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "9c"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "4s"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "2d"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "7h"
+            }
+          }
+        ],
+        "pot": 300,
+        "dealerSeat": 0,
+        "heroSeat": 0,
+        "street": "river",
+        "smallBlind": 10,
+        "bigBlind": 20
+      },
+      "tags": [
+        "clean"
+      ],
+      "metadata": {
+        "imageQuality": "synthetic drawing"
+      },
+      "annotationStatus": "verified"
+    },
+    {
+      "id": "shot-partially-hidden",
+      "sourceType": "digital_screenshot",
+      "image": {
+        "kind": "synthetic",
+        "fixture": "screenshot:partially-hidden"
+      },
+      "groundTruth": {
+        "players": [
+          {
+            "name": "You",
+            "cards": [
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "8s"
+                }
+              },
+              {
+                "card": {
+                  "kind": "unreadable"
+                },
+                "tags": [
+                  "occluded"
+                ]
+              }
+            ],
+            "stack": 640,
+            "bet": 0,
+            "folded": false
+          },
+          {
+            "name": "Jo",
+            "cards": [
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              },
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              }
+            ],
+            "stack": 580,
+            "bet": 40,
+            "folded": false
+          },
+          {
+            "name": "Max",
+            "cards": [
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              },
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              }
+            ],
+            "stack": 300,
+            "bet": 0,
+            "folded": false
+          }
+        ],
+        "board": [
+          {
+            "card": {
+              "kind": "card",
+              "card": "Ac"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "6d"
+            }
+          },
+          {
+            "card": {
+              "kind": "unreadable"
+            },
+            "tags": [
+              "occluded"
+            ]
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "5c"
+            }
+          }
+        ],
+        "pot": 180,
+        "dealerSeat": 1,
+        "heroSeat": 0,
+        "street": "turn",
+        "smallBlind": 10,
+        "bigBlind": 20
+      },
+      "tags": [
+        "occlusion"
+      ],
+      "metadata": {
+        "imageQuality": "synthetic drawing"
+      },
+      "annotationStatus": "verified"
+    },
+    {
+      "id": "shot-unreadable-text",
+      "sourceType": "digital_screenshot",
+      "image": {
+        "kind": "synthetic",
+        "fixture": "screenshot:unreadable-text"
+      },
+      "groundTruth": {
+        "players": [
+          {
+            "name": null,
+            "cards": [
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Jd"
+                }
+              },
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Js"
+                }
+              }
+            ],
+            "stack": null,
+            "bet": 0,
+            "folded": false
+          },
+          {
+            "name": null,
+            "cards": [
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              },
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              }
+            ],
+            "stack": null,
+            "bet": 30,
+            "folded": false
+          },
+          {
+            "name": null,
+            "cards": [
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              },
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              }
+            ],
+            "stack": null,
+            "bet": 0,
+            "folded": false
+          }
+        ],
+        "board": [
+          {
+            "card": {
+              "kind": "card",
+              "card": "Tc"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "4h"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "3s"
+            }
+          }
+        ],
+        "pot": null,
+        "dealerSeat": 1,
+        "heroSeat": 0,
+        "street": "flop",
+        "smallBlind": 5,
+        "bigBlind": 10
+      },
+      "tags": [
+        "unreadable_text",
+        "blur"
+      ],
+      "metadata": {
+        "imageQuality": "synthetic drawing"
+      },
+      "annotationStatus": "verified"
+    },
+    {
+      "id": "photo-two-player-clear",
+      "sourceType": "physical_photo",
+      "image": {
+        "kind": "synthetic",
+        "fixture": "physical:two-player-clear"
+      },
+      "groundTruth": {
+        "players": [
+          {
+            "name": "You",
+            "cards": [
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "As"
+                },
+                "box": {
+                  "x": 0.439,
+                  "y": 0.635,
+                  "width": 0.064,
+                  "height": 0.131
+                }
+              },
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Kd"
+                },
+                "box": {
+                  "x": 0.501,
+                  "y": 0.634,
+                  "width": 0.065,
+                  "height": 0.132
+                }
+              }
+            ],
+            "stack": 995,
+            "bet": 5,
+            "folded": false
+          },
+          {
+            "name": "Riley",
+            "cards": [
+              {
+                "card": {
+                  "kind": "face_down"
+                },
+                "box": {
+                  "x": 0.44,
+                  "y": 0.235,
+                  "width": 0.063,
+                  "height": 0.129
+                }
+              },
+              {
+                "card": {
+                  "kind": "face_down"
+                },
+                "box": {
+                  "x": 0.503,
+                  "y": 0.236,
+                  "width": 0.061,
+                  "height": 0.128
+                }
+              }
+            ],
+            "stack": 990,
+            "bet": 10,
+            "folded": false
+          }
+        ],
+        "board": [],
+        "pot": 0,
+        "dealerSeat": 0,
+        "heroSeat": 0,
+        "street": "preflop",
+        "smallBlind": null,
+        "bigBlind": null
+      },
+      "tags": [
+        "clean"
+      ],
+      "metadata": {
+        "imageQuality": "synthetic drawing"
+      },
+      "annotationStatus": "verified",
+      "chipConfig": {
+        "denominations": [
+          {
+            "colorLabel": "red",
+            "value": 5
+          },
+          {
+            "colorLabel": "green",
+            "value": 25
+          },
+          {
+            "colorLabel": "black",
+            "value": 100
+          }
+        ]
+      }
+    },
+    {
+      "id": "photo-four-player-board",
+      "sourceType": "physical_photo",
+      "image": {
+        "kind": "synthetic",
+        "fixture": "physical:four-player-board"
+      },
+      "groundTruth": {
+        "players": [
+          {
+            "name": "You",
+            "cards": [
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Ah"
+                },
+                "box": {
+                  "x": 0.44,
+                  "y": 0.635,
+                  "width": 0.063,
+                  "height": 0.129
+                }
+              },
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Jc"
+                },
+                "box": {
+                  "x": 0.501,
+                  "y": 0.635,
+                  "width": 0.064,
+                  "height": 0.131
+                }
+              }
+            ],
+            "stack": 820,
+            "bet": 0,
+            "folded": false
+          },
+          {
+            "name": "Pat",
+            "cards": [
+              {
+                "card": {
+                  "kind": "face_down"
+                },
+                "box": {
+                  "x": 0.166,
+                  "y": 0.421,
+                  "width": 0.092,
+                  "height": 0.108
+                },
+                "tags": [
+                  "rotated"
+                ]
+              },
+              {
+                "card": {
+                  "kind": "face_down"
+                },
+                "box": {
+                  "x": 0.168,
+                  "y": 0.501,
+                  "width": 0.088,
+                  "height": 0.098
+                },
+                "tags": [
+                  "rotated"
+                ]
+              }
+            ],
+            "stack": 700,
+            "bet": 0,
+            "folded": false
+          },
+          {
+            "name": "Lee",
+            "cards": [],
+            "stack": null,
+            "bet": 0,
+            "folded": true
+          },
+          {
+            "name": "Kim",
+            "cards": [
+              {
+                "card": {
+                  "kind": "face_down"
+                },
+                "box": {
+                  "x": 0.743,
+                  "y": 0.426,
+                  "width": 0.088,
+                  "height": 0.098
+                },
+                "tags": [
+                  "rotated"
+                ]
+              },
+              {
+                "card": {
+                  "kind": "face_down"
+                },
+                "box": {
+                  "x": 0.743,
+                  "y": 0.501,
+                  "width": 0.088,
+                  "height": 0.098
+                },
+                "tags": [
+                  "rotated"
+                ]
+              }
+            ],
+            "stack": 600,
+            "bet": 60,
+            "folded": false
+          }
+        ],
+        "board": [
+          {
+            "card": {
+              "kind": "card",
+              "card": "Kh"
+            },
+            "box": {
+              "x": 0.371,
+              "y": 0.438,
+              "width": 0.058,
+              "height": 0.125
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "9h"
+            },
+            "box": {
+              "x": 0.438,
+              "y": 0.438,
+              "width": 0.058,
+              "height": 0.125
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "3d"
+            },
+            "box": {
+              "x": 0.504,
+              "y": 0.438,
+              "width": 0.058,
+              "height": 0.125
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "2s"
+            },
+            "box": {
+              "x": 0.571,
+              "y": 0.438,
+              "width": 0.058,
+              "height": 0.125
+            }
+          }
+        ],
+        "pot": 240,
+        "dealerSeat": 2,
+        "heroSeat": 0,
+        "street": "turn",
+        "smallBlind": null,
+        "bigBlind": null
+      },
+      "tags": [
+        "clean"
+      ],
+      "metadata": {
+        "imageQuality": "synthetic drawing"
+      },
+      "annotationStatus": "verified",
+      "chipConfig": {
+        "denominations": [
+          {
+            "colorLabel": "red",
+            "value": 5
+          },
+          {
+            "colorLabel": "green",
+            "value": 25
+          },
+          {
+            "colorLabel": "black",
+            "value": 100
+          }
+        ]
+      }
+    },
+    {
+      "id": "photo-angled-photo",
+      "sourceType": "physical_photo",
+      "image": {
+        "kind": "synthetic",
+        "fixture": "physical:angled-photo"
+      },
+      "groundTruth": {
+        "players": [
+          {
+            "name": "You",
+            "cards": [
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Qs"
+                },
+                "box": {
+                  "x": 0.425,
+                  "y": 0.574,
+                  "width": 0.06,
+                  "height": 0.133
+                },
+                "tags": [
+                  "rotated"
+                ]
+              },
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Qd"
+                },
+                "box": {
+                  "x": 0.478,
+                  "y": 0.611,
+                  "width": 0.068,
+                  "height": 0.135
+                },
+                "tags": [
+                  "rotated"
+                ]
+              }
+            ],
+            "stack": 470,
+            "bet": 0,
+            "folded": false
+          },
+          {
+            "name": "Ash",
+            "cards": [
+              {
+                "card": {
+                  "kind": "face_down"
+                },
+                "box": {
+                  "x": 0.2,
+                  "y": 0.248,
+                  "width": 0.08,
+                  "height": 0.114
+                },
+                "tags": [
+                  "rotated"
+                ]
+              },
+              {
+                "card": {
+                  "kind": "face_down"
+                },
+                "box": {
+                  "x": 0.19,
+                  "y": 0.303,
+                  "width": 0.086,
+                  "height": 0.122
+                },
+                "tags": [
+                  "rotated"
+                ]
+              }
+            ],
+            "stack": 455,
+            "bet": 0,
+            "folded": false
+          },
+          {
+            "name": "Blake",
+            "cards": [
+              {
+                "card": {
+                  "kind": "face_down"
+                },
+                "box": {
+                  "x": 0.722,
+                  "y": 0.594,
+                  "width": 0.086,
+                  "height": 0.122
+                },
+                "tags": [
+                  "rotated"
+                ]
+              },
+              {
+                "card": {
+                  "kind": "face_down"
+                },
+                "box": {
+                  "x": 0.717,
+                  "y": 0.657,
+                  "width": 0.082,
+                  "height": 0.117
+                },
+                "tags": [
+                  "rotated"
+                ]
+              }
+            ],
+            "stack": 990,
+            "bet": 0,
+            "folded": false
+          }
+        ],
+        "board": [
+          {
+            "card": {
+              "kind": "card",
+              "card": "7c"
+            },
+            "box": {
+              "x": 0.407,
+              "y": 0.392,
+              "width": 0.065,
+              "height": 0.135
+            },
+            "tags": [
+              "rotated"
+            ]
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "8c"
+            },
+            "box": {
+              "x": 0.468,
+              "y": 0.433,
+              "width": 0.065,
+              "height": 0.135
+            },
+            "tags": [
+              "rotated"
+            ]
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "2h"
+            },
+            "box": {
+              "x": 0.528,
+              "y": 0.473,
+              "width": 0.065,
+              "height": 0.135
+            },
+            "tags": [
+              "rotated"
+            ]
+          }
+        ],
+        "pot": 75,
+        "dealerSeat": 2,
+        "heroSeat": 0,
+        "street": "flop",
+        "smallBlind": null,
+        "bigBlind": null
+      },
+      "tags": [
+        "angled",
+        "rotated"
+      ],
+      "metadata": {
+        "imageQuality": "synthetic drawing",
+        "orientation": "rotated and angled"
+      },
+      "annotationStatus": "verified",
+      "chipConfig": {
+        "denominations": [
+          {
+            "colorLabel": "red",
+            "value": 5
+          },
+          {
+            "colorLabel": "green",
+            "value": 25
+          },
+          {
+            "colorLabel": "black",
+            "value": 100
+          }
+        ]
+      }
+    },
+    {
+      "id": "photo-partly-hidden",
+      "sourceType": "physical_photo",
+      "image": {
+        "kind": "synthetic",
+        "fixture": "physical:partly-hidden"
+      },
+      "groundTruth": {
+        "players": [
+          {
+            "name": "You",
+            "cards": [
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "8s"
+                },
+                "box": {
+                  "x": 0.44,
+                  "y": 0.635,
+                  "width": 0.063,
+                  "height": 0.129
+                }
+              },
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "8h"
+                },
+                "box": {
+                  "x": 0.501,
+                  "y": 0.635,
+                  "width": 0.064,
+                  "height": 0.131
+                },
+                "tags": [
+                  "occluded"
+                ]
+              }
+            ],
+            "stack": 640,
+            "bet": 0,
+            "folded": false
+          },
+          {
+            "name": "Jo",
+            "cards": [
+              {
+                "card": {
+                  "kind": "face_down"
+                },
+                "box": {
+                  "x": 0.17,
+                  "y": 0.467,
+                  "width": 0.085,
+                  "height": 0.092
+                },
+                "tags": [
+                  "rotated"
+                ]
+              },
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              }
+            ],
+            "stack": 580,
+            "bet": 0,
+            "folded": false
+          },
+          {
+            "name": "Max",
+            "cards": [
+              {
+                "card": {
+                  "kind": "face_down"
+                },
+                "box": {
+                  "x": 0.745,
+                  "y": 0.467,
+                  "width": 0.085,
+                  "height": 0.092
+                },
+                "tags": [
+                  "rotated"
+                ]
+              },
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              }
+            ],
+            "stack": 300,
+            "bet": 0,
+            "folded": false
+          }
+        ],
+        "board": [
+          {
+            "card": {
+              "kind": "card",
+              "card": "Ac"
+            },
+            "box": {
+              "x": 0.371,
+              "y": 0.438,
+              "width": 0.058,
+              "height": 0.125
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "6d"
+            },
+            "box": {
+              "x": 0.438,
+              "y": 0.438,
+              "width": 0.058,
+              "height": 0.125
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "6s"
+            },
+            "box": {
+              "x": 0.504,
+              "y": 0.438,
+              "width": 0.058,
+              "height": 0.125
+            },
+            "tags": [
+              "occluded"
+            ]
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "5c"
+            },
+            "box": {
+              "x": 0.571,
+              "y": 0.438,
+              "width": 0.058,
+              "height": 0.125
+            }
+          }
+        ],
+        "pot": 0,
+        "dealerSeat": 1,
+        "heroSeat": 0,
+        "street": "turn",
+        "smallBlind": null,
+        "bigBlind": null
+      },
+      "tags": [
+        "occlusion"
+      ],
+      "metadata": {
+        "imageQuality": "synthetic drawing"
+      },
+      "annotationStatus": "verified",
+      "chipConfig": {
+        "denominations": [
+          {
+            "colorLabel": "red",
+            "value": 5
+          },
+          {
+            "colorLabel": "green",
+            "value": 25
+          },
+          {
+            "colorLabel": "black",
+            "value": 100
+          }
+        ]
+      }
+    },
+    {
+      "id": "photo-chip-stacks",
+      "sourceType": "physical_photo",
+      "image": {
+        "kind": "synthetic",
+        "fixture": "physical:chip-stacks"
+      },
+      "groundTruth": {
+        "players": [
+          {
+            "name": "You",
+            "cards": [
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Td"
+                },
+                "box": {
+                  "x": 0.44,
+                  "y": 0.635,
+                  "width": 0.063,
+                  "height": 0.129
+                }
+              },
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Tc"
+                },
+                "box": {
+                  "x": 0.501,
+                  "y": 0.635,
+                  "width": 0.064,
+                  "height": 0.131
+                }
+              }
+            ],
+            "stack": 500,
+            "bet": 100,
+            "folded": false
+          },
+          {
+            "name": "Dee",
+            "cards": [
+              {
+                "card": {
+                  "kind": "face_down"
+                },
+                "box": {
+                  "x": 0.17,
+                  "y": 0.467,
+                  "width": 0.085,
+                  "height": 0.092
+                },
+                "tags": [
+                  "rotated"
+                ]
+              },
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              }
+            ],
+            "stack": 450,
+            "bet": 100,
+            "folded": false
+          },
+          {
+            "name": "Rae",
+            "cards": [
+              {
+                "card": {
+                  "kind": "face_down"
+                },
+                "box": {
+                  "x": 0.745,
+                  "y": 0.467,
+                  "width": 0.085,
+                  "height": 0.092
+                },
+                "tags": [
+                  "rotated"
+                ]
+              },
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              }
+            ],
+            "stack": 700,
+            "bet": 0,
+            "folded": false
+          }
+        ],
+        "board": [
+          {
+            "card": {
+              "kind": "card",
+              "card": "Jh"
+            },
+            "box": {
+              "x": 0.404,
+              "y": 0.438,
+              "width": 0.058,
+              "height": 0.125
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "9c"
+            },
+            "box": {
+              "x": 0.471,
+              "y": 0.438,
+              "width": 0.058,
+              "height": 0.125
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "4s"
+            },
+            "box": {
+              "x": 0.538,
+              "y": 0.438,
+              "width": 0.058,
+              "height": 0.125
+            }
+          }
+        ],
+        "pot": 150,
+        "dealerSeat": 2,
+        "heroSeat": 0,
+        "street": "flop",
+        "smallBlind": null,
+        "bigBlind": null
+      },
+      "tags": [
+        "overlap"
+      ],
+      "metadata": {
+        "imageQuality": "synthetic drawing"
+      },
+      "annotationStatus": "verified",
+      "chipConfig": {
+        "denominations": [
+          {
+            "colorLabel": "red",
+            "value": 5
+          },
+          {
+            "colorLabel": "green",
+            "value": 25
+          },
+          {
+            "colorLabel": "black",
+            "value": 100
+          }
+        ]
+      }
+    },
+    {
+      "id": "photo-uncertain-card",
+      "sourceType": "physical_photo",
+      "image": {
+        "kind": "synthetic",
+        "fixture": "physical:uncertain-card"
+      },
+      "groundTruth": {
+        "players": [
+          {
+            "name": "You",
+            "cards": [
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Ac"
+                },
+                "box": {
+                  "x": 0.44,
+                  "y": 0.635,
+                  "width": 0.063,
+                  "height": 0.129
+                }
+              },
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Qc"
+                },
+                "box": {
+                  "x": 0.501,
+                  "y": 0.635,
+                  "width": 0.064,
+                  "height": 0.131
+                }
+              }
+            ],
+            "stack": 900,
+            "bet": 0,
+            "folded": false
+          },
+          {
+            "name": "Drew",
+            "cards": [
+              {
+                "card": {
+                  "kind": "face_down"
+                },
+                "box": {
+                  "x": 0.442,
+                  "y": 0.238,
+                  "width": 0.058,
+                  "height": 0.125
+                }
+              },
+              {
+                "card": {
+                  "kind": "face_down"
+                },
+                "box": {
+                  "x": 0.504,
+                  "y": 0.238,
+                  "width": 0.058,
+                  "height": 0.125
+                }
+              }
+            ],
+            "stack": 1060,
+            "bet": 0,
+            "folded": false
+          }
+        ],
+        "board": [
+          {
+            "card": {
+              "kind": "card",
+              "card": "Ah"
+            },
+            "box": {
+              "x": 0.404,
+              "y": 0.438,
+              "width": 0.058,
+              "height": 0.125
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "Kd"
+            },
+            "box": {
+              "x": 0.471,
+              "y": 0.438,
+              "width": 0.058,
+              "height": 0.125
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "9s"
+            },
+            "box": {
+              "x": 0.532,
+              "y": 0.432,
+              "width": 0.069,
+              "height": 0.136
+            },
+            "tags": [
+              "blurred"
+            ]
+          }
+        ],
+        "pot": 40,
+        "dealerSeat": 0,
+        "heroSeat": 0,
+        "street": "flop",
+        "smallBlind": null,
+        "bigBlind": null
+      },
+      "tags": [
+        "blur"
+      ],
+      "metadata": {
+        "imageQuality": "synthetic drawing"
+      },
+      "annotationStatus": "verified",
+      "chipConfig": {
+        "denominations": [
+          {
+            "colorLabel": "red",
+            "value": 5
+          },
+          {
+            "colorLabel": "green",
+            "value": 25
+          },
+          {
+            "colorLabel": "black",
+            "value": 100
+          }
+        ]
+      }
+    },
+    {
+      "id": "seq-complete-hand-1",
+      "sourceType": "digital_screenshot",
+      "image": {
+        "kind": "synthetic",
+        "fixture": "sequence:complete-hand:1"
+      },
+      "groundTruth": {
+        "players": [
+          {
+            "name": "You",
+            "cards": [
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Qh"
+                }
+              },
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Qc"
+                }
+              }
+            ],
+            "stack": 995,
+            "bet": 5,
+            "folded": false
+          },
+          {
+            "name": "Riley",
+            "cards": [
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              },
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              }
+            ],
+            "stack": 990,
+            "bet": 10,
+            "folded": false
+          },
+          {
+            "name": "Sam",
+            "cards": [
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              },
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              }
+            ],
+            "stack": 1000,
+            "bet": 0,
+            "folded": false
+          }
+        ],
+        "board": [],
+        "pot": 0,
+        "dealerSeat": 2,
+        "heroSeat": 0,
+        "street": "preflop",
+        "smallBlind": 5,
+        "bigBlind": 10
+      },
+      "tags": [
+        "clean"
+      ],
+      "metadata": {
+        "imageQuality": "synthetic drawing"
+      },
+      "annotationStatus": "verified",
+      "notes": "Complete hand, preflop to showdown, frame 1"
+    },
+    {
+      "id": "seq-complete-hand-2",
+      "sourceType": "digital_screenshot",
+      "image": {
+        "kind": "synthetic",
+        "fixture": "sequence:complete-hand:2"
+      },
+      "groundTruth": {
+        "players": [
+          {
+            "name": "You",
+            "cards": [
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Qh"
+                }
+              },
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Qc"
+                }
+              }
+            ],
+            "stack": 990,
+            "bet": 0,
+            "folded": false
+          },
+          {
+            "name": "Riley",
+            "cards": [
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              },
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              }
+            ],
+            "stack": 990,
+            "bet": 0,
+            "folded": false
+          },
+          {
+            "name": "Sam",
+            "cards": [
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              },
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              }
+            ],
+            "stack": 990,
+            "bet": 0,
+            "folded": false
+          }
+        ],
+        "board": [
+          {
+            "card": {
+              "kind": "card",
+              "card": "7s"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "8d"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "2c"
+            }
+          }
+        ],
+        "pot": 30,
+        "dealerSeat": 2,
+        "heroSeat": 0,
+        "street": "flop",
+        "smallBlind": 5,
+        "bigBlind": 10
+      },
+      "tags": [
+        "clean"
+      ],
+      "metadata": {
+        "imageQuality": "synthetic drawing"
+      },
+      "annotationStatus": "verified",
+      "notes": "Complete hand, preflop to showdown, frame 2"
+    },
+    {
+      "id": "seq-complete-hand-3",
+      "sourceType": "digital_screenshot",
+      "image": {
+        "kind": "synthetic",
+        "fixture": "sequence:complete-hand:3"
+      },
+      "groundTruth": {
+        "players": [
+          {
+            "name": "You",
+            "cards": [
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Qh"
+                }
+              },
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Qc"
+                }
+              }
+            ],
+            "stack": 970,
+            "bet": 0,
+            "folded": false
+          },
+          {
+            "name": "Riley",
+            "cards": [
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              },
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              }
+            ],
+            "stack": 970,
+            "bet": 0,
+            "folded": false
+          },
+          {
+            "name": "Sam",
+            "cards": [],
+            "stack": 990,
+            "bet": 0,
+            "folded": true
+          }
+        ],
+        "board": [
+          {
+            "card": {
+              "kind": "card",
+              "card": "7s"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "8d"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "2c"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "Kh"
+            }
+          }
+        ],
+        "pot": 70,
+        "dealerSeat": 2,
+        "heroSeat": 0,
+        "street": "turn",
+        "smallBlind": 5,
+        "bigBlind": 10
+      },
+      "tags": [
+        "clean"
+      ],
+      "metadata": {
+        "imageQuality": "synthetic drawing"
+      },
+      "annotationStatus": "verified",
+      "notes": "Complete hand, preflop to showdown, frame 3"
+    },
+    {
+      "id": "seq-complete-hand-4",
+      "sourceType": "digital_screenshot",
+      "image": {
+        "kind": "synthetic",
+        "fixture": "sequence:complete-hand:4"
+      },
+      "groundTruth": {
+        "players": [
+          {
+            "name": "You",
+            "cards": [
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Qh"
+                }
+              },
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Qc"
+                }
+              }
+            ],
+            "stack": 970,
+            "bet": 0,
+            "folded": false
+          },
+          {
+            "name": "Riley",
+            "cards": [
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              },
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              }
+            ],
+            "stack": 970,
+            "bet": 0,
+            "folded": false
+          },
+          {
+            "name": "Sam",
+            "cards": [],
+            "stack": 990,
+            "bet": 0,
+            "folded": true
+          }
+        ],
+        "board": [
+          {
+            "card": {
+              "kind": "card",
+              "card": "7s"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "8d"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "2c"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "Kh"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "3d"
+            }
+          }
+        ],
+        "pot": 70,
+        "dealerSeat": 2,
+        "heroSeat": 0,
+        "street": "river",
+        "smallBlind": 5,
+        "bigBlind": 10
+      },
+      "tags": [
+        "clean"
+      ],
+      "metadata": {
+        "imageQuality": "synthetic drawing"
+      },
+      "annotationStatus": "verified",
+      "notes": "Complete hand, preflop to showdown, frame 4"
+    },
+    {
+      "id": "seq-complete-hand-5",
+      "sourceType": "digital_screenshot",
+      "image": {
+        "kind": "synthetic",
+        "fixture": "sequence:complete-hand:5"
+      },
+      "groundTruth": {
+        "players": [
+          {
+            "name": "You",
+            "cards": [
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Qh"
+                }
+              },
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Qc"
+                }
+              }
+            ],
+            "stack": 1090,
+            "bet": 0,
+            "folded": false
+          },
+          {
+            "name": "Riley",
+            "cards": [
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "As"
+                }
+              },
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "9s"
+                }
+              }
+            ],
+            "stack": 920,
+            "bet": 0,
+            "folded": false
+          },
+          {
+            "name": "Sam",
+            "cards": [],
+            "stack": 990,
+            "bet": 0,
+            "folded": true
+          }
+        ],
+        "board": [
+          {
+            "card": {
+              "kind": "card",
+              "card": "7s"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "8d"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "2c"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "Kh"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "3d"
+            }
+          }
+        ],
+        "pot": 0,
+        "dealerSeat": 2,
+        "heroSeat": 0,
+        "street": "river",
+        "smallBlind": 5,
+        "bigBlind": 10
+      },
+      "tags": [
+        "clean"
+      ],
+      "metadata": {
+        "imageQuality": "synthetic drawing"
+      },
+      "annotationStatus": "verified",
+      "notes": "Complete hand, preflop to showdown, frame 5"
+    },
+    {
+      "id": "seq-missing-street-1",
+      "sourceType": "digital_screenshot",
+      "image": {
+        "kind": "synthetic",
+        "fixture": "sequence:missing-street:1"
+      },
+      "groundTruth": {
+        "players": [
+          {
+            "name": "You",
+            "cards": [
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Ah"
+                }
+              },
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Jh"
+                }
+              }
+            ],
+            "stack": 995,
+            "bet": 5,
+            "folded": false
+          },
+          {
+            "name": "Morgan",
+            "cards": [
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              },
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              }
+            ],
+            "stack": 990,
+            "bet": 10,
+            "folded": false
+          }
+        ],
+        "board": [],
+        "pot": 0,
+        "dealerSeat": 0,
+        "heroSeat": 0,
+        "street": "preflop",
+        "smallBlind": 5,
+        "bigBlind": 10
+      },
+      "tags": [
+        "clean"
+      ],
+      "metadata": {
+        "imageQuality": "synthetic drawing"
+      },
+      "annotationStatus": "verified",
+      "notes": "Missing flop screenshot, frame 1"
+    },
+    {
+      "id": "seq-missing-street-2",
+      "sourceType": "digital_screenshot",
+      "image": {
+        "kind": "synthetic",
+        "fixture": "sequence:missing-street:2"
+      },
+      "groundTruth": {
+        "players": [
+          {
+            "name": "You",
+            "cards": [
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Ah"
+                }
+              },
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Jh"
+                }
+              }
+            ],
+            "stack": 960,
+            "bet": 0,
+            "folded": false
+          },
+          {
+            "name": "Morgan",
+            "cards": [
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              },
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              }
+            ],
+            "stack": 960,
+            "bet": 0,
+            "folded": false
+          }
+        ],
+        "board": [
+          {
+            "card": {
+              "kind": "card",
+              "card": "As"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "7d"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "2h"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "9c"
+            }
+          }
+        ],
+        "pot": 80,
+        "dealerSeat": 0,
+        "heroSeat": 0,
+        "street": "turn",
+        "smallBlind": 5,
+        "bigBlind": 10
+      },
+      "tags": [
+        "clean"
+      ],
+      "metadata": {
+        "imageQuality": "synthetic drawing"
+      },
+      "annotationStatus": "verified",
+      "notes": "Missing flop screenshot, frame 2"
+    },
+    {
+      "id": "seq-ambiguous-betting-1",
+      "sourceType": "digital_screenshot",
+      "image": {
+        "kind": "synthetic",
+        "fixture": "sequence:ambiguous-betting:1"
+      },
+      "groundTruth": {
+        "players": [
+          {
+            "name": "You",
+            "cards": [
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Td"
+                }
+              },
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "9d"
+                }
+              }
+            ],
+            "stack": 980,
+            "bet": 0,
+            "folded": false
+          },
+          {
+            "name": "Pat",
+            "cards": [
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              },
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              }
+            ],
+            "stack": 980,
+            "bet": 0,
+            "folded": false
+          },
+          {
+            "name": "Kim",
+            "cards": [
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              },
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              }
+            ],
+            "stack": 980,
+            "bet": 0,
+            "folded": false
+          }
+        ],
+        "board": [
+          {
+            "card": {
+              "kind": "card",
+              "card": "Jh"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "8c"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "4d"
+            }
+          }
+        ],
+        "pot": 60,
+        "dealerSeat": 1,
+        "heroSeat": 0,
+        "street": "flop",
+        "smallBlind": 10,
+        "bigBlind": 20
+      },
+      "tags": [
+        "clean"
+      ],
+      "metadata": {
+        "imageQuality": "synthetic drawing"
+      },
+      "annotationStatus": "verified",
+      "notes": "Ambiguous betting, frame 1"
+    },
+    {
+      "id": "seq-ambiguous-betting-2",
+      "sourceType": "digital_screenshot",
+      "image": {
+        "kind": "synthetic",
+        "fixture": "sequence:ambiguous-betting:2"
+      },
+      "groundTruth": {
+        "players": [
+          {
+            "name": "You",
+            "cards": [
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Td"
+                }
+              },
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "9d"
+                }
+              }
+            ],
+            "stack": 980,
+            "bet": 0,
+            "folded": false
+          },
+          {
+            "name": "Pat",
+            "cards": [
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              },
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              }
+            ],
+            "stack": null,
+            "bet": 0,
+            "folded": false
+          },
+          {
+            "name": "Kim",
+            "cards": [
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              },
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              }
+            ],
+            "stack": null,
+            "bet": 0,
+            "folded": false
+          }
+        ],
+        "board": [
+          {
+            "card": {
+              "kind": "card",
+              "card": "Jh"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "8c"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "4d"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "5s"
+            }
+          }
+        ],
+        "pot": 120,
+        "dealerSeat": 1,
+        "heroSeat": 0,
+        "street": "turn",
+        "smallBlind": 10,
+        "bigBlind": 20
+      },
+      "tags": [
+        "clean"
+      ],
+      "metadata": {
+        "imageQuality": "synthetic drawing"
+      },
+      "annotationStatus": "verified",
+      "notes": "Ambiguous betting, frame 2"
+    },
+    {
+      "id": "seq-recognition-error-1",
+      "sourceType": "digital_screenshot",
+      "image": {
+        "kind": "synthetic",
+        "fixture": "sequence:recognition-error:1"
+      },
+      "groundTruth": {
+        "players": [
+          {
+            "name": "You",
+            "cards": [
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Ac"
+                }
+              },
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Qc"
+                }
+              }
+            ],
+            "stack": 900,
+            "bet": 0,
+            "folded": false
+          },
+          {
+            "name": "Drew",
+            "cards": [
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              },
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              }
+            ],
+            "stack": 1060,
+            "bet": 0,
+            "folded": false
+          }
+        ],
+        "board": [
+          {
+            "card": {
+              "kind": "card",
+              "card": "Ah"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "Kd"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "7c"
+            }
+          }
+        ],
+        "pot": 40,
+        "dealerSeat": 0,
+        "heroSeat": 0,
+        "street": "flop",
+        "smallBlind": 5,
+        "bigBlind": 10
+      },
+      "tags": [
+        "clean"
+      ],
+      "metadata": {
+        "imageQuality": "synthetic drawing"
+      },
+      "annotationStatus": "verified",
+      "notes": "Misread card, frame 1"
+    },
+    {
+      "id": "seq-recognition-error-2",
+      "sourceType": "digital_screenshot",
+      "image": {
+        "kind": "synthetic",
+        "fixture": "sequence:recognition-error:2"
+      },
+      "groundTruth": {
+        "players": [
+          {
+            "name": "You",
+            "cards": [
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Ac"
+                }
+              },
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Qc"
+                }
+              }
+            ],
+            "stack": 900,
+            "bet": 0,
+            "folded": false
+          },
+          {
+            "name": "Drew",
+            "cards": [
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              },
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              }
+            ],
+            "stack": 1060,
+            "bet": 0,
+            "folded": false
+          }
+        ],
+        "board": [
+          {
+            "card": {
+              "kind": "card",
+              "card": "Ah"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "Kd"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "7c"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "2h"
+            }
+          }
+        ],
+        "pot": 40,
+        "dealerSeat": 0,
+        "heroSeat": 0,
+        "street": "turn",
+        "smallBlind": 5,
+        "bigBlind": 10
+      },
+      "tags": [
+        "clean"
+      ],
+      "metadata": {
+        "imageQuality": "synthetic drawing"
+      },
+      "annotationStatus": "verified",
+      "notes": "Misread card, frame 2"
+    },
+    {
+      "id": "seq-multiway-all-in-1",
+      "sourceType": "digital_screenshot",
+      "image": {
+        "kind": "synthetic",
+        "fixture": "sequence:multiway-all-in:1"
+      },
+      "groundTruth": {
+        "players": [
+          {
+            "name": "You",
+            "cards": [
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Kc"
+                }
+              },
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Kh"
+                }
+              }
+            ],
+            "stack": 490,
+            "bet": 10,
+            "folded": false
+          },
+          {
+            "name": "Ash",
+            "cards": [
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              },
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              }
+            ],
+            "stack": 180,
+            "bet": 20,
+            "folded": false
+          },
+          {
+            "name": "Blake",
+            "cards": [
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              },
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              }
+            ],
+            "stack": 1000,
+            "bet": 0,
+            "folded": false
+          }
+        ],
+        "board": [],
+        "pot": 0,
+        "dealerSeat": 2,
+        "heroSeat": 0,
+        "street": "preflop",
+        "smallBlind": 10,
+        "bigBlind": 20
+      },
+      "tags": [
+        "clean"
+      ],
+      "metadata": {
+        "imageQuality": "synthetic drawing"
+      },
+      "annotationStatus": "verified",
+      "notes": "Three-way all-in with a side pot, frame 1"
+    },
+    {
+      "id": "seq-multiway-all-in-2",
+      "sourceType": "digital_screenshot",
+      "image": {
+        "kind": "synthetic",
+        "fixture": "sequence:multiway-all-in:2"
+      },
+      "groundTruth": {
+        "players": [
+          {
+            "name": "You",
+            "cards": [
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Kc"
+                }
+              },
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Kh"
+                }
+              }
+            ],
+            "stack": 0,
+            "bet": 500,
+            "folded": false
+          },
+          {
+            "name": "Ash",
+            "cards": [
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Qs"
+                }
+              },
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Qd"
+                }
+              }
+            ],
+            "stack": 0,
+            "bet": 200,
+            "folded": false
+          },
+          {
+            "name": "Blake",
+            "cards": [
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "9c"
+                }
+              },
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "9d"
+                }
+              }
+            ],
+            "stack": 500,
+            "bet": 500,
+            "folded": false
+          }
+        ],
+        "board": [],
+        "pot": 0,
+        "dealerSeat": 2,
+        "heroSeat": 0,
+        "street": "preflop",
+        "smallBlind": 10,
+        "bigBlind": 20
+      },
+      "tags": [
+        "clean"
+      ],
+      "metadata": {
+        "imageQuality": "synthetic drawing"
+      },
+      "annotationStatus": "verified",
+      "notes": "Three-way all-in with a side pot, frame 2"
+    },
+    {
+      "id": "seq-multiway-all-in-3",
+      "sourceType": "digital_screenshot",
+      "image": {
+        "kind": "synthetic",
+        "fixture": "sequence:multiway-all-in:3"
+      },
+      "groundTruth": {
+        "players": [
+          {
+            "name": "You",
+            "cards": [
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Kc"
+                }
+              },
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Kh"
+                }
+              }
+            ],
+            "stack": 600,
+            "bet": 0,
+            "folded": false
+          },
+          {
+            "name": "Ash",
+            "cards": [
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Qs"
+                }
+              },
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Qd"
+                }
+              }
+            ],
+            "stack": 600,
+            "bet": 0,
+            "folded": false
+          },
+          {
+            "name": "Blake",
+            "cards": [
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "9c"
+                }
+              },
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "9d"
+                }
+              }
+            ],
+            "stack": 500,
+            "bet": 0,
+            "folded": false
+          }
+        ],
+        "board": [
+          {
+            "card": {
+              "kind": "card",
+              "card": "2s"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "5h"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "Qc"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "8d"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "3c"
+            }
+          }
+        ],
+        "pot": 0,
+        "dealerSeat": 2,
+        "heroSeat": 0,
+        "street": "river",
+        "smallBlind": 10,
+        "bigBlind": 20
+      },
+      "tags": [
+        "clean"
+      ],
+      "metadata": {
+        "imageQuality": "synthetic drawing"
+      },
+      "annotationStatus": "verified",
+      "notes": "Three-way all-in with a side pot, frame 3"
+    },
+    {
+      "id": "seq-demo-track-1",
+      "sourceType": "digital_screenshot",
+      "image": {
+        "kind": "synthetic",
+        "fixture": "sequence:demo-track:1"
+      },
+      "groundTruth": {
+        "players": [
+          {
+            "name": "You",
+            "cards": [
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Qh"
+                }
+              },
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Qc"
+                }
+              }
+            ],
+            "stack": 995,
+            "bet": 5,
+            "folded": false
+          },
+          {
+            "name": "Riley",
+            "cards": [
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              },
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              }
+            ],
+            "stack": 990,
+            "bet": 10,
+            "folded": false
+          },
+          {
+            "name": "Sam",
+            "cards": [
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              },
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              }
+            ],
+            "stack": 1000,
+            "bet": 0,
+            "folded": false
+          }
+        ],
+        "board": [],
+        "pot": 0,
+        "dealerSeat": 2,
+        "heroSeat": 0,
+        "street": "preflop",
+        "smallBlind": 5,
+        "bigBlind": 10
+      },
+      "tags": [
+        "clean"
+      ],
+      "metadata": {
+        "imageQuality": "synthetic drawing"
+      },
+      "annotationStatus": "verified",
+      "notes": "Demo: tracked three-player hand, frame 1"
+    },
+    {
+      "id": "seq-demo-track-2",
+      "sourceType": "digital_screenshot",
+      "image": {
+        "kind": "synthetic",
+        "fixture": "sequence:demo-track:2"
+      },
+      "groundTruth": {
+        "players": [
+          {
+            "name": "You",
+            "cards": [
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Qh"
+                }
+              },
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Qc"
+                }
+              }
+            ],
+            "stack": 990,
+            "bet": 0,
+            "folded": false
+          },
+          {
+            "name": "Riley",
+            "cards": [
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              },
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              }
+            ],
+            "stack": 990,
+            "bet": 0,
+            "folded": false
+          },
+          {
+            "name": "Sam",
+            "cards": [
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              },
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              }
+            ],
+            "stack": 990,
+            "bet": 0,
+            "folded": false
+          }
+        ],
+        "board": [
+          {
+            "card": {
+              "kind": "card",
+              "card": "7s"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "8d"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "2c"
+            }
+          }
+        ],
+        "pot": 30,
+        "dealerSeat": 2,
+        "heroSeat": 0,
+        "street": "flop",
+        "smallBlind": 5,
+        "bigBlind": 10
+      },
+      "tags": [
+        "clean"
+      ],
+      "metadata": {
+        "imageQuality": "synthetic drawing"
+      },
+      "annotationStatus": "verified",
+      "notes": "Demo: tracked three-player hand, frame 2"
+    },
+    {
+      "id": "seq-demo-track-3",
+      "sourceType": "digital_screenshot",
+      "image": {
+        "kind": "synthetic",
+        "fixture": "sequence:demo-track:3"
+      },
+      "groundTruth": {
+        "players": [
+          {
+            "name": "You",
+            "cards": [
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Qh"
+                }
+              },
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Qc"
+                }
+              }
+            ],
+            "stack": 970,
+            "bet": 0,
+            "folded": false
+          },
+          {
+            "name": null,
+            "cards": [
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              },
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              }
+            ],
+            "stack": 970,
+            "bet": 0,
+            "folded": false
+          },
+          {
+            "name": "Sam",
+            "cards": [],
+            "stack": 990,
+            "bet": 0,
+            "folded": true
+          }
+        ],
+        "board": [
+          {
+            "card": {
+              "kind": "card",
+              "card": "7s"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "8d"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "2c"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "Kh"
+            }
+          }
+        ],
+        "pot": 70,
+        "dealerSeat": 2,
+        "heroSeat": 0,
+        "street": "turn",
+        "smallBlind": 5,
+        "bigBlind": 10
+      },
+      "tags": [
+        "unreadable_text"
+      ],
+      "metadata": {
+        "imageQuality": "synthetic drawing"
+      },
+      "annotationStatus": "verified",
+      "notes": "Demo: tracked three-player hand, frame 3"
+    },
+    {
+      "id": "seq-demo-track-4",
+      "sourceType": "digital_screenshot",
+      "image": {
+        "kind": "synthetic",
+        "fixture": "sequence:demo-track:4"
+      },
+      "groundTruth": {
+        "players": [
+          {
+            "name": "You",
+            "cards": [
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Qh"
+                }
+              },
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Qc"
+                }
+              }
+            ],
+            "stack": 970,
+            "bet": 0,
+            "folded": false
+          },
+          {
+            "name": "Riley",
+            "cards": [
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              },
+              {
+                "card": {
+                  "kind": "face_down"
+                }
+              }
+            ],
+            "stack": 970,
+            "bet": 0,
+            "folded": false
+          }
+        ],
+        "board": [
+          {
+            "card": {
+              "kind": "card",
+              "card": "7s"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "8d"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "2c"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "Kh"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "3d"
+            }
+          }
+        ],
+        "pot": 70,
+        "dealerSeat": null,
+        "heroSeat": 0,
+        "street": "river",
+        "smallBlind": 5,
+        "bigBlind": 10
+      },
+      "tags": [
+        "clean"
+      ],
+      "metadata": {
+        "imageQuality": "synthetic drawing"
+      },
+      "annotationStatus": "verified",
+      "notes": "Demo: tracked three-player hand, frame 4"
+    },
+    {
+      "id": "seq-demo-track-5",
+      "sourceType": "digital_screenshot",
+      "image": {
+        "kind": "synthetic",
+        "fixture": "sequence:demo-track:5"
+      },
+      "groundTruth": {
+        "players": [
+          {
+            "name": "You",
+            "cards": [
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Qh"
+                }
+              },
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Qc"
+                }
+              }
+            ],
+            "stack": 1090,
+            "bet": 0,
+            "folded": false
+          },
+          {
+            "name": "Riley",
+            "cards": [
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "As"
+                }
+              },
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "9s"
+                }
+              }
+            ],
+            "stack": 920,
+            "bet": 0,
+            "folded": false
+          },
+          {
+            "name": "Sam",
+            "cards": [],
+            "stack": 990,
+            "bet": 0,
+            "folded": true
+          }
+        ],
+        "board": [
+          {
+            "card": {
+              "kind": "card",
+              "card": "7s"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "8d"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "2c"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "Kh"
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "3d"
+            }
+          }
+        ],
+        "pot": 0,
+        "dealerSeat": 2,
+        "heroSeat": 0,
+        "street": "river",
+        "smallBlind": 5,
+        "bigBlind": 10
+      },
+      "tags": [
+        "clean"
+      ],
+      "metadata": {
+        "imageQuality": "synthetic drawing"
+      },
+      "annotationStatus": "verified",
+      "notes": "Demo: tracked three-player hand, frame 5"
+    },
+    {
+      "id": "photo-physical-seq-1",
+      "sourceType": "physical_photo",
+      "image": {
+        "kind": "synthetic",
+        "fixture": "physical:physical-seq-1"
+      },
+      "groundTruth": {
+        "players": [
+          {
+            "name": "You",
+            "cards": [
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Qh"
+                },
+                "box": {
+                  "x": 0.44,
+                  "y": 0.635,
+                  "width": 0.063,
+                  "height": 0.129
+                }
+              },
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Qc"
+                },
+                "box": {
+                  "x": 0.501,
+                  "y": 0.635,
+                  "width": 0.064,
+                  "height": 0.131
+                }
+              }
+            ],
+            "stack": 995,
+            "bet": 5,
+            "folded": false
+          },
+          {
+            "name": "Riley",
+            "cards": [
+              {
+                "card": {
+                  "kind": "face_down"
+                },
+                "box": {
+                  "x": 0.168,
+                  "y": 0.426,
+                  "width": 0.088,
+                  "height": 0.098
+                },
+                "tags": [
+                  "rotated"
+                ]
+              },
+              {
+                "card": {
+                  "kind": "face_down"
+                },
+                "box": {
+                  "x": 0.17,
+                  "y": 0.504,
+                  "width": 0.085,
+                  "height": 0.092
+                },
+                "tags": [
+                  "rotated"
+                ]
+              }
+            ],
+            "stack": 990,
+            "bet": 10,
+            "folded": false
+          },
+          {
+            "name": "Sam",
+            "cards": [
+              {
+                "card": {
+                  "kind": "face_down"
+                },
+                "box": {
+                  "x": 0.745,
+                  "y": 0.429,
+                  "width": 0.085,
+                  "height": 0.092
+                },
+                "tags": [
+                  "rotated"
+                ]
+              },
+              {
+                "card": {
+                  "kind": "face_down"
+                },
+                "box": {
+                  "x": 0.744,
+                  "y": 0.503,
+                  "width": 0.086,
+                  "height": 0.094
+                },
+                "tags": [
+                  "rotated"
+                ]
+              }
+            ],
+            "stack": 1000,
+            "bet": 0,
+            "folded": false
+          }
+        ],
+        "board": [],
+        "pot": 0,
+        "dealerSeat": 2,
+        "heroSeat": 0,
+        "street": "preflop",
+        "smallBlind": null,
+        "bigBlind": null
+      },
+      "tags": [
+        "clean"
+      ],
+      "metadata": {
+        "imageQuality": "synthetic drawing"
+      },
+      "annotationStatus": "verified",
+      "chipConfig": {
+        "denominations": [
+          {
+            "colorLabel": "red",
+            "value": 5
+          },
+          {
+            "colorLabel": "green",
+            "value": 25
+          },
+          {
+            "colorLabel": "black",
+            "value": 100
+          }
+        ]
+      },
+      "notes": "Physical hand: preflop"
+    },
+    {
+      "id": "photo-physical-seq-2",
+      "sourceType": "physical_photo",
+      "image": {
+        "kind": "synthetic",
+        "fixture": "physical:physical-seq-2"
+      },
+      "groundTruth": {
+        "players": [
+          {
+            "name": "You",
+            "cards": [
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Qh"
+                },
+                "box": {
+                  "x": 0.44,
+                  "y": 0.635,
+                  "width": 0.063,
+                  "height": 0.129
+                }
+              },
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Qc"
+                },
+                "box": {
+                  "x": 0.501,
+                  "y": 0.635,
+                  "width": 0.064,
+                  "height": 0.131
+                }
+              }
+            ],
+            "stack": 990,
+            "bet": 0,
+            "folded": false
+          },
+          {
+            "name": "Riley",
+            "cards": [
+              {
+                "card": {
+                  "kind": "face_down"
+                },
+                "box": {
+                  "x": 0.168,
+                  "y": 0.426,
+                  "width": 0.088,
+                  "height": 0.098
+                },
+                "tags": [
+                  "rotated"
+                ]
+              },
+              {
+                "card": {
+                  "kind": "face_down"
+                },
+                "box": {
+                  "x": 0.17,
+                  "y": 0.504,
+                  "width": 0.085,
+                  "height": 0.092
+                },
+                "tags": [
+                  "rotated"
+                ]
+              }
+            ],
+            "stack": 990,
+            "bet": 0,
+            "folded": false
+          },
+          {
+            "name": "Sam",
+            "cards": [
+              {
+                "card": {
+                  "kind": "face_down"
+                },
+                "box": {
+                  "x": 0.745,
+                  "y": 0.429,
+                  "width": 0.085,
+                  "height": 0.092
+                },
+                "tags": [
+                  "rotated"
+                ]
+              },
+              {
+                "card": {
+                  "kind": "face_down"
+                },
+                "box": {
+                  "x": 0.744,
+                  "y": 0.503,
+                  "width": 0.086,
+                  "height": 0.094
+                },
+                "tags": [
+                  "rotated"
+                ]
+              }
+            ],
+            "stack": 990,
+            "bet": 0,
+            "folded": false
+          }
+        ],
+        "board": [
+          {
+            "card": {
+              "kind": "card",
+              "card": "7s"
+            },
+            "box": {
+              "x": 0.371,
+              "y": 0.438,
+              "width": 0.058,
+              "height": 0.125
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "8d"
+            },
+            "box": {
+              "x": 0.438,
+              "y": 0.438,
+              "width": 0.058,
+              "height": 0.125
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "2c"
+            },
+            "box": {
+              "x": 0.504,
+              "y": 0.438,
+              "width": 0.058,
+              "height": 0.125
+            }
+          }
+        ],
+        "pot": 30,
+        "dealerSeat": 2,
+        "heroSeat": 0,
+        "street": "flop",
+        "smallBlind": null,
+        "bigBlind": null
+      },
+      "tags": [
+        "clean"
+      ],
+      "metadata": {
+        "imageQuality": "synthetic drawing"
+      },
+      "annotationStatus": "verified",
+      "chipConfig": {
+        "denominations": [
+          {
+            "colorLabel": "red",
+            "value": 5
+          },
+          {
+            "colorLabel": "green",
+            "value": 25
+          },
+          {
+            "colorLabel": "black",
+            "value": 100
+          }
+        ]
+      },
+      "notes": "Physical hand: flop"
+    },
+    {
+      "id": "photo-physical-seq-3",
+      "sourceType": "physical_photo",
+      "image": {
+        "kind": "synthetic",
+        "fixture": "physical:physical-seq-3"
+      },
+      "groundTruth": {
+        "players": [
+          {
+            "name": "You",
+            "cards": [
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Qh"
+                },
+                "box": {
+                  "x": 0.44,
+                  "y": 0.635,
+                  "width": 0.063,
+                  "height": 0.129
+                }
+              },
+              {
+                "card": {
+                  "kind": "card",
+                  "card": "Qc"
+                },
+                "box": {
+                  "x": 0.501,
+                  "y": 0.635,
+                  "width": 0.064,
+                  "height": 0.131
+                }
+              }
+            ],
+            "stack": 970,
+            "bet": 0,
+            "folded": false
+          },
+          {
+            "name": "Riley",
+            "cards": [
+              {
+                "card": {
+                  "kind": "face_down"
+                },
+                "box": {
+                  "x": 0.168,
+                  "y": 0.426,
+                  "width": 0.088,
+                  "height": 0.098
+                },
+                "tags": [
+                  "rotated"
+                ]
+              },
+              {
+                "card": {
+                  "kind": "face_down"
+                },
+                "box": {
+                  "x": 0.17,
+                  "y": 0.504,
+                  "width": 0.085,
+                  "height": 0.092
+                },
+                "tags": [
+                  "rotated"
+                ]
+              }
+            ],
+            "stack": 970,
+            "bet": 0,
+            "folded": false
+          },
+          {
+            "name": "Sam",
+            "cards": [],
+            "stack": 990,
+            "bet": 0,
+            "folded": true
+          }
+        ],
+        "board": [
+          {
+            "card": {
+              "kind": "card",
+              "card": "7s"
+            },
+            "box": {
+              "x": 0.371,
+              "y": 0.438,
+              "width": 0.058,
+              "height": 0.125
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "8d"
+            },
+            "box": {
+              "x": 0.438,
+              "y": 0.438,
+              "width": 0.058,
+              "height": 0.125
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "2c"
+            },
+            "box": {
+              "x": 0.504,
+              "y": 0.438,
+              "width": 0.058,
+              "height": 0.125
+            }
+          },
+          {
+            "card": {
+              "kind": "card",
+              "card": "Kh"
+            },
+            "box": {
+              "x": 0.571,
+              "y": 0.438,
+              "width": 0.058,
+              "height": 0.125
+            }
+          }
+        ],
+        "pot": 70,
+        "dealerSeat": 2,
+        "heroSeat": 0,
+        "street": "turn",
+        "smallBlind": null,
+        "bigBlind": null
+      },
+      "tags": [
+        "clean"
+      ],
+      "metadata": {
+        "imageQuality": "synthetic drawing"
+      },
+      "annotationStatus": "verified",
+      "chipConfig": {
+        "denominations": [
+          {
+            "colorLabel": "red",
+            "value": 5
+          },
+          {
+            "colorLabel": "green",
+            "value": 25
+          },
+          {
+            "colorLabel": "black",
+            "value": 100
+          }
+        ]
+      },
+      "notes": "Physical hand: turn"
+    }
+  ],
+  "sequences": [
+    {
+      "id": "complete-hand",
+      "sampleIds": [
+        "seq-complete-hand-1",
+        "seq-complete-hand-2",
+        "seq-complete-hand-3",
+        "seq-complete-hand-4",
+        "seq-complete-hand-5"
+      ],
+      "notes": "Three players, 5/10 blinds, 1,000 chips each. Every chip is visible in every frame."
+    },
+    {
+      "id": "missing-street",
+      "sampleIds": [
+        "seq-missing-street-1",
+        "seq-missing-street-2"
+      ],
+      "notes": "Heads-up: a preflop frame, then the turn. The flop and its betting were never captured."
+    },
+    {
+      "id": "ambiguous-betting",
+      "sampleIds": [
+        "seq-ambiguous-betting-1",
+        "seq-ambiguous-betting-2"
+      ],
+      "notes": "The pot grows from 60 to 120 while two stacks are unreadable, so who put in what is unknown."
+    },
+    {
+      "id": "recognition-error",
+      "sampleIds": [
+        "seq-recognition-error-1",
+        "seq-recognition-error-2"
+      ],
+      "notes": "The reader takes the 7♣ on the flop for a 7♠ on the turn, which contradicts the earlier frame."
+    },
+    {
+      "id": "multiway-all-in",
+      "sampleIds": [
+        "seq-multiway-all-in-1",
+        "seq-multiway-all-in-2",
+        "seq-multiway-all-in-3"
+      ],
+      "notes": "Ash is all-in for 200 and wins the main pot; you win the 600 side pot from Blake."
+    },
+    {
+      "id": "demo-track",
+      "sampleIds": [
+        "seq-demo-track-1",
+        "seq-demo-track-2",
+        "seq-demo-track-3",
+        "seq-demo-track-4",
+        "seq-demo-track-5"
+      ],
+      "notes": "Five frames from preflop to showdown with an unreadable name, a hidden folded player, a misread card to correct, one interval with confirmed actions, and unresolved gaps."
+    },
+    {
+      "id": "physical-sequence",
+      "sampleIds": [
+        "photo-physical-seq-1",
+        "photo-physical-seq-2",
+        "photo-physical-seq-3"
+      ],
+      "notes": "Three photos of one physical hand."
+    }
+  ],
+  "notes": "Drawn tables made for this project. Truth comes from the drawing definitions; the stored readings are the mock predictions and include deliberate mistakes. Scores on synthetic drawings say nothing about accuracy on real images."
+}

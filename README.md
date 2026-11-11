@@ -65,6 +65,29 @@ Select **Scan table**. To try it without an API key, pick a demo and press **Loa
 
 Details and limits: [src/physical/PHYSICAL.md](src/physical/PHYSICAL.md).
 
+### Recognition benchmarks
+
+Select **Benchmarks** to measure recognition against labeled ground truth. This is an evaluation tool for developers; its numbers describe the chosen dataset only.
+
+- **Mock run, free and deterministic:**
+
+  ```bash
+  npm run benchmark
+  ```
+
+  It runs the built-in synthetic dataset with stored readings, which include deliberate mistakes. The dashboard's **Mock** mode does the same.
+- **Real run, paid:** choose **Real** in the dashboard (with `npm start` and `ANTHROPIC_API_KEY`), or run:
+
+  ```bash
+  npm run benchmark -- --dataset my-dataset.json --real
+  ```
+
+  Both show the image count and ask first, and can be cancelled.
+- **Results:** card, table, chip, photo-detection, confidence, difficulty, and tracking metrics, each with its counts. There is also a failure list, a sample explorer, saved runs with comparison, and JSON and CSV export.
+- **Annotation:** **Annotate ground truth** labels your own images and exports a validated dataset.
+
+Unit tests check the metric code; only real runs on real labeled images measure accuracy. Details: [src/benchmark/BENCHMARKS.md](src/benchmark/BENCHMARKS.md).
+
 ## Phone and offline use
 
 For a phone trial, serve `dist/` from an HTTPS static origin the phone can reach. First load it while connected and give the service worker time to cache the app before checking an offline reload. Use your browser’s install or home screen option if available. The file picker works as the fallback on browsers that do not support direct photo capture. The local development server listens on loopback by default. A static host has no `/api/recognize` endpoint, so photo recognition works only through `npm start` (or another server that mounts `scripts/recognize.mjs`); browsers allow camera capture on a phone only over HTTPS.
@@ -74,6 +97,6 @@ For a phone trial, serve `dist/` from an HTTPS static origin the phone can reach
 - [Specification](SPEC.md) covers product boundaries, data contracts, decision assumptions, and capture privacy.
 - [Implementation plan](PLAN.md) covers milestones, the test matrix, and the next work item.
 - [Repository instructions](AGENTS.md) and [Claude Code entry point](CLAUDE.md) define how to divide and review tasks.
-- `src/core/` holds state, the plugin registry, and equity. `src/rules/` holds Hold’em rules. `src/history/` holds the hand history and replay engine (pure, no browser APIs). `src/vision/` holds the photo and screenshot recognition contracts, providers, review checks, and synthetic screenshot fixtures. `src/physical/` holds physical-table photos: the spatial model, reading validation, table geometry, chip values, corrections, conversion to the shared table state, photo quality, and demo scenes (pure, no browser APIs). `src/reconstruction/` holds hand tracking as separate pure modules: player identity (`identity.ts`), state comparison (`compare.ts`), temporal consistency (`consistency.ts`), reconstruction (`reconstruct.ts`), replay steps, the recognition queue, and sessions. `scripts/recognize.mjs` is the server-side Claude API endpoint. `src/web/` and `web/` hold the table interface and worker entry points.
+- `src/core/` holds state, the plugin registry, and equity. `src/rules/` holds Hold’em rules. `src/history/` holds the hand history and replay engine (pure, no browser APIs). `src/vision/` holds the photo and screenshot recognition contracts, providers, review checks, and synthetic screenshot fixtures. `src/benchmark/` holds recognition benchmarking: dataset validation, metrics, the runner, reports, and the built-in synthetic dataset (committed as `benchmarks/datasets/synthetic-1.json`); `scripts/benchmark.mjs` runs it from the command line. `src/physical/` holds physical-table photos: the spatial model, reading validation, table geometry, chip values, corrections, conversion to the shared table state, photo quality, and demo scenes (pure, no browser APIs). `src/reconstruction/` holds hand tracking as separate pure modules: player identity (`identity.ts`), state comparison (`compare.ts`), temporal consistency (`consistency.ts`), reconstruction (`reconstruct.ts`), replay steps, the recognition queue, and sessions. `scripts/recognize.mjs` is the server-side Claude API endpoint. `src/web/` and `web/` hold the table interface and worker entry points.
 
 The folder is ready to put under Git. Start each coding agent from this directory so it picks up the project instructions.

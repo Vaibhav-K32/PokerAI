@@ -3,3 +3,4 @@ dist/
 .env*
 *.local.md
 .claude/settings.local.json
+benchmarks/runs/

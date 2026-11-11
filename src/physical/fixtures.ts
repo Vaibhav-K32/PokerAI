@@ -226,6 +226,9 @@ export function readingFor(scene: PhysicalScene) {
   };
 }
 
+/** The exact box of a card in a scene, as fractions of the photo (ground truth for benchmarks). */
+export const sceneCardBox = (scene: PhysicalScene, c: SceneCard) => cardBox(viewMatrix(scene), c);
+
 const fixture = (scene: PhysicalScene): PhysicalFixture => ({ scene, response: { modelId: 'fixture', layout: 'physical', result: readingFor(scene) } });
 
 // ---------------------------------------------------------------------------

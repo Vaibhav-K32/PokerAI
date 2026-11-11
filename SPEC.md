@@ -85,6 +85,29 @@ Scan table reads one user-chosen still photo of a physical table from a simulate
 
 Details: [src/physical/PHYSICAL.md](src/physical/PHYSICAL.md).
 
+### Recognition benchmarks
+
+Benchmarks measure recognition against labeled ground truth.
+
+**Datasets:** versioned JSON manifests of samples (screenshots or photos) with independently annotated ground truth, validated at runtime. Validation rejects duplicate cards (unless a sample targets malformed input), impossible boards and streets, and unsafe image paths. Unknown values (`null`, `unreadable`) are distinct from zero.
+
+**The built-in dataset:** it is synthetic, with truth taken from the drawing definitions, and its stored readings act as deterministic mock predictions.
+
+**Real runs:** they use the existing recognition endpoints only after explicit confirmation, with bounded concurrency, no repeated images, cancellation, latency recording, and optional raw output.
+
+**Metrics:** every metric reports its numerator and denominator, and n/a when there is none.
+- **Cards:** by exact location, never by appearing elsewhere: exact, rank-only, suit-only, wrong, missing, extra, invented, and correct unknown or hidden.
+- **Table:** seats, roles, street, folded status, and invalid states.
+- **Pot, stacks, and bets:** exact-match rate and mean absolute error, plus missing and invented values.
+- **Photos:** detection precision and recall by IoU ≥ 0.5 matching, or "unsupported" without positions, and card grouping.
+- **Tracking:** sequence metrics against sequence-level truth.
+- **Confidence:** accuracy by categorical label, since numeric calibration is unavailable.
+- **Difficulty:** summaries per tag, with small-sample warnings.
+
+**Runs:** they record their dataset, metric version, provider, models, configuration, git commit (on the command line), and usage; cost is reported as unavailable. Runs are compared metric by metric, and comparisons with a different dataset, metric version, or selection are flagged as non-equivalent. Reports export as JSON and CSV without images or secrets.
+
+Details: [src/benchmark/BENCHMARKS.md](src/benchmark/BENCHMARKS.md).
+
 ## Platform and interface
 
 Use strict TypeScript, standard browser APIs, a static HTML/CSS interface, and a worker for equity. One client serves desktop and phone. A manifest and service worker provide the offline shell after a successful first load on a secure origin. Use localhost for development and HTTPS for installation on a phone. Photo capture support varies, so retain a regular file picker. Revisit a native wrapper only if device testing identifies a concrete camera, inference, or installation gap.

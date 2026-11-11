@@ -8,6 +8,7 @@ import { cardName, rankLabel, renderCardFace, suitNames, suitSymbols } from './c
 import { pickCard } from './card-picker.js';
 import { prepareUpload } from './image.js';
 import { initReplay } from './replay.js';
+import { initBenchmarks } from './benchmark-view.js';
 import { initPhysicalScan } from './physical-view.js';
 import { initReconstruction } from './reconstruct-view.js';
 import { initScreenshotImport } from './screenshot-view.js';
@@ -877,6 +878,7 @@ const replay = initReplay({ onAnalyze: loadSnapshot, onLeaveScreenshot: () => sc
 screenshotImport = initScreenshotImport({ loadIntoTable: loadSnapshot, replay });
 const tracker = initReconstruction({ replay });
 physicalScan = initPhysicalScan({ loadIntoTable: loadSnapshot, showStudy: () => replay.showView('study'), track: tracker });
+initBenchmarks();
 
 if (window.isSecureContext && 'serviceWorker' in navigator) {
   // When a newer build takes control, reload once so the page runs it. Skip the

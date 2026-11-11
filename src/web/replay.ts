@@ -36,7 +36,7 @@ function deepFreeze<T>(value: T): T {
 }
 
 export interface ReplayController {
-  showView(view: 'study' | 'replay' | 'screenshot' | 'reconstruct' | 'physical'): void;
+  showView(view: 'study' | 'replay' | 'screenshot' | 'reconstruct' | 'physical' | 'benchmark'): void;
   /** Reload saved hands from storage and redraw the list. */
   reloadHands(): void;
   /** Open a saved hand at a replay position and show the replay view. */
@@ -44,7 +44,7 @@ export interface ReplayController {
 }
 
 export function initReplay(options: { onAnalyze: (snapshot: Snapshot) => void; onLeaveScreenshot?: () => void; onLeavePhysical?: () => void }): ReplayController {
-  const views = ['study', 'replay', 'screenshot', 'reconstruct', 'physical'] as const;
+  const views = ['study', 'replay', 'screenshot', 'reconstruct', 'physical', 'benchmark'] as const;
   const tabs = [...document.querySelectorAll<HTMLButtonElement>('.view-tab')];
   const status = element('history-status');
   const list = element('hand-list');

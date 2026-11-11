@@ -464,3 +464,22 @@ footer { padding-block: 1.25rem 2rem; color: #425d55; font-size: .88rem; }
 .phys-amount { display: flex; flex-wrap: wrap; gap: .4rem; align-items: end; margin: .35rem 0; }
 .phys-amount .review-field { min-width: 7rem; }
 .phys-cards { margin: .3rem 0; }
+
+/* Benchmarks --------------------------------------------------------------- */
+.bench-workspace { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.15rem; margin-top: -1rem; }
+.bench-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); gap: .8rem; margin: .8rem 0; }
+.bench-table-box { overflow-x: auto; }
+.bench-table-box h4 { margin: .4rem 0; font-size: .9rem; }
+.bench-table { width: 100%; border-collapse: collapse; font-size: .84rem; }
+.bench-table th, .bench-table td { text-align: left; padding: .3rem .45rem; border-bottom: 1px solid #e3e9e1; vertical-align: top; }
+.bench-table th { font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; color: #4a645d; }
+.bench-table tr.bench-bad td { background: #fff4f2; }
+.bench-table tr.change-improved td:last-child { color: #1b634b; font-weight: 700; }
+.bench-table tr.change-regressed td:last-child { color: #8a1c12; font-weight: 700; }
+.bench-errors { font-size: .84rem; padding-left: 1.1rem; max-height: 18rem; overflow: auto; }
+.bench-image { width: 100%; height: auto; border-radius: .6rem; border: 1px solid #d7e0d6; }
+.bench-slots { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin: .3rem 0; }
+.bench-slot { display: flex; gap: .3rem; align-items: center; }
+.bench-slot select { width: auto; min-height: 2.2rem; margin: 0; padding: .2rem .4rem; font-size: .82rem; }
+.bench-slot .card-slot { --card-w: 2.4rem; }
+.bench-tags { display: flex; flex-wrap: wrap; gap: .3rem .8rem; margin: .4rem 0; }
