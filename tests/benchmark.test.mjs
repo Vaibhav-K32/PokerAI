@@ -54,7 +54,8 @@ test('the built-in dataset validates, is deterministic, and matches the committe
   assert.deepEqual(parseDataset(serializeDataset(ds)), ds);
   assert.equal(serializeDataset(builtinDataset()), serializeDataset(ds), 'building twice gives the same dataset');
   const committed = readFileSync(new URL('../benchmarks/datasets/synthetic-1.json', import.meta.url), 'utf8');
-  assert.equal(committed.trim(), serializeDataset(ds), 'run `npm run benchmark -- --write-dataset benchmarks/datasets/synthetic-1.json` after changing fixtures');
+  // Git may check the file out with Windows line endings; compare the content, not the line breaks.
+  assert.equal(committed.replace(/\r\n/g, '\n').trim(), serializeDataset(ds), 'run `npm run benchmark -- --write-dataset benchmarks/datasets/synthetic-1.json` after changing fixtures');
   for (const s of ds.samples) assert.ok(s.image.kind !== 'synthetic' || builtinSvg(s.image.fixture), s.id + ' has a drawing');
 });
 
